@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>문제은행 관리자</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/dist/umd/supabase.js"></script>
+  <style>body { font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; background: #f8f7ff; }</style>
+</head>
+<body class="text-slate-800">
+  <header class="bg-[#1e1b4b] text-white">
+    <div class="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+      <b>문제은행 관리자</b>
+      <button id="logout" class="hidden text-sm px-3 py-1.5 rounded-full bg-white/10">로그아웃</button>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto p-4">
+    <!-- 로그인 -->
+    <form id="loginForm" class="hidden max-w-sm mx-auto mt-16 bg-white rounded-2xl p-6 space-y-3 border border-slate-100">
+      <h1 class="text-lg font-extrabold text-[#1e1b4b]">관리자 로그인</h1>
+      <input id="lEmail" type="email" placeholder="이메일" class="w-full h-11 rounded-xl border border-slate-200 px-3" />
+      <input id="lPw" type="password" placeholder="비밀번호" class="w-full h-11 rounded-xl border border-slate-200 px-3" />
+      <p id="lErr" class="text-sm text-rose-600"></p>
+      <button class="w-full h-11 rounded-xl bg-[#1e1b4b] text-white font-bold">로그인</button>
+    </form>
+
+    <!-- 주문 목록 -->
+    <section id="dash" class="hidden">
+      <div class="flex gap-2 overflow-x-auto" id="filters">
+        <button data-f="PENDING"  class="h-9 px-4 rounded-full border text-sm font-semibold">대기</button>
+        <button data-f="APPROVED" class="h-9 px-4 rounded-full border text-sm font-semibold">승인</button>
+        <button data-f="REJECTED" class="h-9 px-4 rounded-full border text-sm font-semibold">거절</button>
+        <button data-f="ALL"      class="h-9 px-4 rounded-full border text-sm font-semibold">전체</button>
+        <button id="reload" class="ml-auto h-9 px-4 rounded-full bg-slate-100 text-sm font-semibold">↻</button>
+      </div>
+      <div id="list" class="mt-4 space-y-3"></div>
+    </section>
+  </main>
+
+<script>
+const SUPABASE_URL = '';      // index.html CONFIG.supabase 와 동일
+const SUPABASE_ANON_KEY = '';
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const METHOD = { KAKAOPAY: '카카오페이', BANK: '계좌이체', TOSS: '토스/기타' };
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  document.querySelector('main').innerHTML = '<p class="mt-16 text-center text-rose-600 font-bold">admin.html 상단의 SUPABASE_URL / SUPABASE_ANON_KEY 를 먼저 채워주세요.</p>';
+  throw new Error('Supabase config missing');
+}
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let filter = 'PENDING';
+
+async function load() {
+  let q = sb.from('orders').select('*, products(title)').order('created_at', { ascending: false }).limit(200);
+  if (filter !== 'ALL') q = q.eq('status', filter);
+  const { data, error } = await q;
+  document.querySelectorAll('[data-f]').forEach((b) => {
+    b.className = `h-9 px-4 rounded-full border text-sm font-semibold ${b.dataset.f === filter ? 'bg-[#1e1b4b] text-white' : 'bg-white'}`;
+  });
+  if (error) { $('#list').innerHTML = `<p class="text-rose-600">${esc(error.message)}</p>`; return; }
+  if (!data.length) { $('#list').innerHTML = '<p class="py-16 text-center text-slate-400">주문 없음</p>'; return; }
+  $('#list').innerHTML = data.map((o) => `
+    <div class="bg-white rounded-xl border border-slate-100 p-4">
+      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span class="font-mono">${esc(o.order_no)}</span>
+        <span>· ${new Date(o.created_at).toLocaleString('ko-KR')}</span>
+        <span class="ml-auto font-bold">${esc(o.status)}</span>
+      </div>
+      <p class="mt-2 font-bold text-[#1e1b4b]">${esc(o.buyer_name)} · ${Number(o.amount).toLocaleString('ko-KR')}원 <span class="text-sm font-semibold text-violet-600">${METHOD[o.payment_method]}</span></p>
+      <p class="text-sm text-slate-500">${esc(o.products?.title || o.product_id)} · ${esc(o.email)} · 다운로드 ${o.download_count}/${o.download_limit}</p>
+      ${o.status === 'PENDING' ? `
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button data-act="APPROVED" data-id="${o.id}" class="h-10 rounded-xl bg-emerald-600 text-white font-bold">입금 확인 · 승인</button>
+          <button data-act="REJECTED" data-id="${o.id}" class="h-10 rounded-xl border border-slate-200 font-semibold">확인 불가</button>
+        </div>` : ''}
+      ${o.status === 'APPROVED' ? `<button data-reset="${o.id}" class="mt-3 text-xs underline text-slate-500">다운로드 횟수 초기화</button>` : ''}
+    </div>`).join('');
+}
+
+async function setStatus(id, status) {
+  if (!confirm(status === 'APPROVED' ? '입금 확인하고 승인할까요? 구매자에게 메일이 나갑니다.' : '확인 불가 처리할까요?')) return;
+  const { error } = await sb.from('orders').update({ status }).eq('id', id);
+  if (error) return alert(error.message);
+  load();
+}
+
+async function showSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  $('#loginForm').classList.toggle('hidden', !!session);
+  $('#dash').classList.toggle('hidden', !session);
+  $('#logout').classList.toggle('hidden', !session);
+  if (session) load();
+}
+
+$('#loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const { error } = await sb.auth.signInWithPassword({ email: $('#lEmail').value, password: $('#lPw').value });
+  $('#lErr').textContent = error ? error.message : '';
+  showSession();
+};
+$('#logout').onclick = async () => { await sb.auth.signOut(); showSession(); };
+$('#reload').onclick = load;
+document.addEventListener('click', async (e) => {
+  const f = e.target.closest('[data-f]');
+  if (f) { filter = f.dataset.f; load(); }
+  const a = e.target.closest('[data-act]');
+  if (a) setStatus(a.dataset.id, a.dataset.act);
+  const r = e.target.closest('[data-reset]');
+  if (r && confirm('다운로드 횟수를 0으로 되돌릴까요?')) {
+    const { error } = await sb.from('orders').update({ download_count: 0 }).eq('id', r.dataset.reset);
+    if (error) alert(error.message); else load();
+  }
+});
+
+showSession();
+</script>
+</body>
+</html>
