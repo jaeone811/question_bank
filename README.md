@@ -1,6 +1,6 @@
 # 기말고사 문제은행
 
-내신 변형 문제 PDF 판매 사이트. 무료 샘플 미리보기 → 송금(카카오페이 / 계좌이체 / 토스) → 입금 확인 요청 → 관리자 승인 → 구매자 이메일로 풀버전 PDF 첨부 발송.
+내신 변형 문제 PDF 판매 사이트. 무료 샘플 미리보기 → 송금(카카오페이 / 계좌이체 / 토스) → 입금 확인 요청 → 관리자 승인 → 이메일로 PDF 첨부 발송 또는 인스타그램 DM용 5시간 다운로드 링크 발급.
 
 ```
 index.html                         # 프론트 (단일 파일, Tailwind CDN + Vanilla JS)
@@ -8,7 +8,7 @@ admin.html                         # 관리자 승인 페이지
 samples/                           # 무료 샘플 PDF (공개)
 supabase/schema.sql                # 테이블 · RLS · RPC · 비공개 버킷
 supabase/webhooks.sql              # 주문 INSERT/UPDATE → notify-order 호출 트리거
-supabase/functions/notify-order    # 관리자 알림 · 승인 시 PDF 첨부 메일 발송 · 재발송 · 구글 시트
+supabase/functions/notify-order    # 관리자 알림 · PDF 첨부 메일 · 인스타용 다운로드 링크 · 재발송 · 구글 시트
 integrations/google-sheet.gs       # (선택) 구글 시트 Apps Script
 ```
 
@@ -17,8 +17,9 @@ integrations/google-sheet.gs       # (선택) 구글 시트 Apps Script
 `index.html` 상단 `CONFIG` 수정하고 아무 정적 호스팅(GitHub Pages, Netlify 등)에 올리면 끝.
 주문은 LocalStorage 에만 저장됨 (`qb_orders_v1`). 이 모드에선 주문이 관리자에게 전달되지 않으니 입금 확인·PDF 발송은 직접 해야 함.
 
-- `kakaoPayLink`: 카카오페이 송금코드 링크 (`https://qr.kakaopay.com/...`)
-- `tossLink`: 토스아이디 링크 (`https://toss.me/아이디`)
+- `kakaoPayLink`: 카카오페이 송금코드 링크 (`https://qr.kakaopay.com/...`) — PC 에선 QR 로 표시
+- `tossLink`: 토스아이디 링크 (`https://toss.me/아이디`) — PC 에선 QR 로 표시
+- `instagramId`: 다운로드 링크를 DM 으로 보낼 판매자 인스타 아이디
 - `bank`: 은행명 / 계좌번호 / 예금주
 - `PRODUCTS`: 상품 목록, `samples/` 에 샘플 PDF
 
@@ -45,13 +46,15 @@ integrations/google-sheet.gs       # (선택) 구글 시트 Apps Script
 | --- | --- |
 | 주문 | `create_order` RPC — 금액은 서버가 `products.price` 로 재계산, 주문번호 서버 발급 |
 | 알림 | INSERT 웹훅 → `notify-order` → 관리자 메일 (+ 구글 시트) |
-| 승인 | `admin.html` 에서 승인 → UPDATE 웹훅 → `notify-order` 가 비공개 버킷에서 PDF 를 꺼내 구매자 이메일로 첨부 발송 |
-| 결과 | 발송 성공 시 `delivered_at`, 실패 시 `delivery_error` 기록 → 관리자 페이지에 표시, "PDF 메일 재발송" 버튼으로 다시 보낼 수 있음 |
+| 승인 (이메일) | `admin.html` 에서 승인 → UPDATE 웹훅 → `notify-order` 가 비공개 버킷에서 PDF 를 꺼내 구매자 이메일로 첨부 발송. 성공 시 `delivered_at`, 실패 시 `delivery_error` 기록, "PDF 메일 재발송" 가능 |
+| 승인 (인스타) | 같은 웹훅에서 5시간 후 만료되는 Signed URL 발급 → `download_url` 저장 → 관리자 페이지에서 "DM 문구 복사" → "DM 열기"로 직접 전송 → "DM 보냄 체크". 만료되면 "링크 재발급" |
 
 보안 메모
 - `orders` 는 anon 이 직접 select/insert 못 함. RPC(security definer)로만 접근.
 - 상태 조회는 **주문번호 + 이메일** 둘 다 일치해야 함.
 - 풀버전 PDF 는 비공개 버킷에만 있고, 관리자가 승인한 주문에만 Edge Function 이 첨부해서 보냄.
 - Resend 는 메일 한 통당 40MB(첨부 base64 인코딩 후 기준) 제한 → PDF 는 대략 30MB 이하로 유지.
-- 재발송은 관리자 로그인 토큰으로만 호출 가능 (`admins` 테이블 확인).
+- 재발송·링크 재발급은 관리자 로그인 토큰으로만 호출 가능 (`admins` 테이블 확인).
+- 인스타 DM 자동 발송은 안 함: Instagram Messaging API 는 프로페셔널 계정 + Meta 앱 심사가 필요하고, 상대가 먼저 DM 을 보낸 경우에만 답장 가능. 그래서 관리자가 직접 보냄.
+- Signed URL 은 만료 전까지 누구나 열 수 있음 (5시간 동안 공유되면 같이 받을 수 있음).
 - 송금 자동 확인은 없음 (개인 계좌 API 없음). 관리자가 입금 내역 보고 수동 승인.

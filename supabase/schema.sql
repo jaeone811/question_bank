@@ -18,7 +18,9 @@ create table if not exists public.orders (
   id               uuid primary key default gen_random_uuid(),
   order_no         text not null unique,
   buyer_name       text not null check (char_length(buyer_name) between 1 and 20),
-  email            text not null check (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]{2,}$'),
+  delivery_method  text not null default 'EMAIL' check (delivery_method in ('EMAIL', 'INSTAGRAM')),
+  email            text check (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]{2,}$'),
+  instagram_id     text check (instagram_id ~ '^[a-z0-9._]{1,30}$'),
   product_id       text not null references public.products(id),
   payment_method   text not null check (payment_method in ('KAKAOPAY', 'BANK', 'TOSS')),
   amount           integer not null check (amount > 0),
@@ -26,8 +28,10 @@ create table if not exists public.orders (
   admin_memo       text,
   created_at       timestamptz not null default now(),
   approved_at      timestamptz,
-  delivered_at     timestamptz,                  -- PDF 첨부 메일 발송 성공 시각
-  delivery_error   text                          -- 발송 실패 사유 (관리자 페이지에 표시)
+  delivered_at        timestamptz,               -- EMAIL: 첨부 메일 발송 성공 시각 / INSTAGRAM: 관리자가 DM 발송 완료 체크한 시각
+  delivery_error      text,                      -- 발송 실패 사유 (관리자 페이지에 표시)
+  download_url        text,                      -- INSTAGRAM: 5시간짜리 Signed URL (관리자만 조회 가능)
+  download_expires_at timestamptz
 );
 -- 이전 버전(다운로드 링크 방식) 스키마를 이미 실행했다면 컬럼 정리
 alter table public.orders drop column if exists download_count;
@@ -35,6 +39,19 @@ alter table public.orders drop column if exists download_limit;
 alter table public.orders drop column if exists last_download_at;
 alter table public.orders add column if not exists delivered_at timestamptz;
 alter table public.orders add column if not exists delivery_error text;
+-- 인스타그램 수령 추가 (이전 버전에서 업그레이드하는 경우)
+alter table public.orders add column if not exists delivery_method text not null default 'EMAIL'
+  check (delivery_method in ('EMAIL', 'INSTAGRAM'));
+alter table public.orders add column if not exists instagram_id text check (instagram_id ~ '^[a-z0-9._]{1,30}$');
+alter table public.orders add column if not exists download_url text;
+alter table public.orders add column if not exists download_expires_at timestamptz;
+alter table public.orders alter column email drop not null;
+-- 받는 방법에 맞는 연락처가 반드시 있어야 함
+alter table public.orders drop constraint if exists orders_contact_chk;
+alter table public.orders add constraint orders_contact_chk check (
+  (delivery_method = 'EMAIL' and email is not null) or
+  (delivery_method = 'INSTAGRAM' and instagram_id is not null)
+);
 create index if not exists orders_status_created_idx on public.orders (status, created_at desc);
 create index if not exists orders_email_idx on public.orders (email);
 
@@ -90,12 +107,15 @@ create trigger trg_orders_approved_at before update on public.orders
 
 -- ---------- 6. RPC: 주문 생성 (anon 호출) ----------
 -- 금액은 클라이언트 값을 믿지 않고 products.price 로 덮어씀
+drop function if exists public.create_order(text, text, text, text, integer);
 create or replace function public.create_order(
-  p_buyer_name     text,
-  p_email          text,
-  p_product_id     text,
-  p_payment_method text,
-  p_amount         integer default null
+  p_buyer_name      text,
+  p_product_id      text,
+  p_payment_method  text,
+  p_delivery_method text,
+  p_email           text default null,
+  p_instagram_id    text default null,
+  p_amount          integer default null
 )
 returns json
 language plpgsql security definer set search_path = public
@@ -109,15 +129,18 @@ begin
     raise exception 'INVALID_PRODUCT';
   end if;
 
-  insert into public.orders (order_no, buyer_name, email, product_id, payment_method, amount)
+  insert into public.orders (order_no, buyer_name, product_id, payment_method, amount,
+                             delivery_method, email, instagram_id)
   values (
     'QB-' || to_char(now() at time zone 'Asia/Seoul', 'YYMMDD') || '-'
           || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
     trim(p_buyer_name),
-    lower(trim(p_email)),
     p_product_id,
     p_payment_method,
-    v_price
+    v_price,
+    p_delivery_method,
+    case when p_delivery_method = 'EMAIL' then nullif(lower(trim(p_email)), '') end,
+    case when p_delivery_method = 'INSTAGRAM' then nullif(lower(ltrim(trim(p_instagram_id), '@')), '') end
   )
   returning * into v_row;
 
@@ -129,22 +152,24 @@ begin
   );
 end $$;
 
--- ---------- 7. RPC: 주문 상태 조회 (주문번호 + 이메일 둘 다 맞아야 함) ----------
-create or replace function public.get_order_status(p_order_no text, p_email text)
+-- ---------- 7. RPC: 주문 상태 조회 (주문번호 + 이메일/인스타 아이디 둘 다 맞아야 함) ----------
+drop function if exists public.get_order_status(text, text);
+create or replace function public.get_order_status(p_order_no text, p_contact text)
 returns text
 language sql stable security definer set search_path = public
 as $$
   select status from public.orders
-  where order_no = p_order_no and email = lower(trim(p_email));
+  where order_no = p_order_no
+    and (email = lower(trim(p_contact)) or instagram_id = lower(ltrim(trim(p_contact), '@')));
 $$;
 
 -- (이전 버전의 다운로드 횟수 차감 함수 제거)
 drop function if exists public.claim_download(text, text);
 
 -- ---------- 9. 권한 ----------
-revoke all on function public.create_order(text, text, text, text, integer) from public;
+revoke all on function public.create_order(text, text, text, text, text, text, integer) from public;
 revoke all on function public.get_order_status(text, text)               from public;
-grant execute on function public.create_order(text, text, text, text, integer) to anon, authenticated;
+grant execute on function public.create_order(text, text, text, text, text, text, integer) to anon, authenticated;
 grant execute on function public.get_order_status(text, text)               to anon, authenticated;
 
 -- ---------- 10. 비공개 Storage 버킷 ----------

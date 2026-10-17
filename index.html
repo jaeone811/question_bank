@@ -32,7 +32,7 @@
     .modal.open .modal-panel { animation: up .22s ease-out; }
     @keyframes up { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
     .tab-active { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
-    .pay-active { border-color: #8b5cf6; background: #f5f3ff; box-shadow: 0 0 0 3px rgba(139,92,246,.18); }
+    .pay-active, .dlv-active { border-color: #8b5cf6; background: #f5f3ff; box-shadow: 0 0 0 3px rgba(139,92,246,.18); }
     .toast { transition: opacity .2s, transform .2s; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { scrollbar-width: none; }
@@ -74,7 +74,7 @@
       <dl class="mt-10 grid grid-cols-3 gap-3 max-w-md text-center">
         <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">변형 문항</dt><dd class="text-xl font-extrabold">1,200+</dd></div>
         <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">과목</dt><dd class="text-xl font-extrabold" id="statSubjects">-</dd></div>
-        <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">받는 방법</dt><dd class="text-xl font-extrabold">이메일</dd></div>
+        <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">받는 방법</dt><dd class="text-xl font-extrabold">메일·DM</dd></div>
       </dl>
     </div>
   </section>
@@ -110,14 +110,13 @@
       </div>
       <div class="rounded-2xl bg-white border border-slate-100 p-5">
         <div class="text-2xl">③ 📩</div>
-        <h3 class="mt-2 font-bold text-navy">이메일로 수령</h3>
-        <p class="text-sm text-slate-500 mt-1">입금이 확인되면 입력하신 이메일로 풀버전 PDF를 첨부해 보내드립니다.</p>
+        <h3 class="mt-2 font-bold text-navy">PDF 수령</h3>
+        <p class="text-sm text-slate-500 mt-1">입금이 확인되면 이메일로 PDF를 첨부해 보내드리거나, 인스타그램 DM으로 다운로드 링크(5시간 유효)를 보내드립니다.</p>
       </div>
     </section>
 
     <footer class="mt-12 text-center text-xs text-slate-400 leading-relaxed">
-      © 기말고사 문제은행 · 본 자료는 개인 학습용이며 무단 배포·재판매를 금지합니다.<br />
-      문의: <a id="contactLink" class="underline" href="#">카카오톡 오픈채팅</a>
+      © 기말고사 문제은행 · 본 자료는 개인 학습용이며 무단 배포·재판매를 금지합니다.
     </footer>
   </main>
 
@@ -167,15 +166,38 @@
             <span class="text-xs font-semibold text-slate-500">입금자명 <span class="text-rose-500">*</span></span>
             <input id="fName" type="text" maxlength="20" autocomplete="name" placeholder="송금 시 표시되는 이름과 동일하게 입력" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
           </label>
-          <label class="block">
-            <span class="text-xs font-semibold text-slate-500">이메일 주소 <span class="text-rose-500">*</span></span>
-            <input id="fEmail" type="email" autocomplete="email" inputmode="email" placeholder="PDF를 받으실 이메일 주소" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
-          </label>
-          <label class="block">
-            <span class="text-xs font-semibold text-slate-500">이메일 주소 확인 <span class="text-rose-500">*</span></span>
-            <input id="fEmail2" type="email" autocomplete="off" inputmode="email" placeholder="이메일 주소를 한 번 더 입력" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
-            <span class="block mt-1 text-[11px] text-slate-400">입금이 확인되면 이 주소로 PDF 파일이 발송됩니다. 정확하게 입력해 주세요.</span>
-          </label>
+          <div>
+            <span class="text-xs font-semibold text-slate-500">PDF 받는 방법</span>
+            <div class="mt-1 grid grid-cols-2 gap-2" role="radiogroup">
+              <label class="dlv-opt cursor-pointer h-11 rounded-xl border-2 border-slate-200 grid place-items-center text-sm font-bold" data-delivery="EMAIL">
+                <input type="radio" name="delivery" value="EMAIL" class="sr-only" checked />이메일
+              </label>
+              <label class="dlv-opt cursor-pointer h-11 rounded-xl border-2 border-slate-200 grid place-items-center text-sm font-bold" data-delivery="INSTAGRAM">
+                <input type="radio" name="delivery" value="INSTAGRAM" class="sr-only" />인스타그램 DM
+              </label>
+            </div>
+          </div>
+          <div data-dlv-pane="EMAIL" class="space-y-3">
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">이메일 주소 <span class="text-rose-500">*</span></span>
+              <input id="fEmail" type="email" autocomplete="email" inputmode="email" placeholder="PDF를 받으실 이메일 주소" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
+            </label>
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">이메일 주소 확인 <span class="text-rose-500">*</span></span>
+              <input id="fEmail2" type="email" autocomplete="off" inputmode="email" placeholder="이메일 주소를 한 번 더 입력" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
+              <span class="block mt-1 text-[11px] text-slate-400">입금이 확인되면 이 주소로 PDF 파일이 첨부되어 발송됩니다. 정확하게 입력해 주세요.</span>
+            </label>
+          </div>
+          <div data-dlv-pane="INSTAGRAM" class="space-y-3 hidden">
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">인스타그램 아이디 <span class="text-rose-500">*</span></span>
+              <div class="mt-1 flex items-center h-11 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-point-violet">
+                <span class="text-slate-400 mr-1">@</span>
+                <input id="fInsta" type="text" maxlength="31" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="instagram_id" class="flex-1 min-w-0 h-full focus:outline-none" />
+              </div>
+              <span class="block mt-1 text-[11px] text-slate-400 leading-relaxed">입금이 확인되면 <b id="shopInsta1">@-</b> 계정에서 DM으로 다운로드 링크를 보내드립니다. 링크는 발급 후 <b>5시간</b> 동안만 유효하니 받으시는 대로 내려받아 주세요. DM이 '메시지 요청'함에 도착할 수 있습니다.</span>
+            </label>
+          </div>
           <p id="formError" class="hidden text-sm text-rose-600 font-semibold"></p>
         </fieldset>
 
@@ -229,8 +251,12 @@
             </div>
 
             <!-- 토스 -->
-            <div data-pane="TOSS" class="mt-3 hidden">
+            <div data-pane="TOSS" class="mt-3 hidden space-y-3">
               <a id="tossLink" target="_blank" rel="noopener" class="h-11 w-full rounded-xl bg-[#0064FF] text-white font-bold grid place-items-center">토스로 송금하기</a>
+              <div class="hidden md:flex flex-col items-center gap-2">
+                <div id="tossQR" class="p-2 bg-white rounded-lg"></div>
+                <span class="text-xs text-slate-400">PC에서는 휴대폰 카메라로 QR 코드를 스캔해 주세요</span>
+              </div>
             </div>
           </div>
         </fieldset>
@@ -254,8 +280,9 @@
       <h3 class="mt-4 text-lg font-extrabold text-navy">입금 확인 요청이 접수되었습니다</h3>
       <p class="mt-2 text-sm text-slate-500 leading-relaxed">
         주문번호 <b id="doneOrderNo" class="text-navy">-</b><br />
-        입금이 확인되면 <b id="doneEmail" class="text-navy break-all">-</b>(으)로<br />풀버전 PDF를 보내드립니다.
+        <span id="doneMsg">-</span>
       </p>
+      <a id="doneInstaDM" target="_blank" rel="noopener" class="hidden mt-4 h-11 rounded-xl bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] text-white font-bold grid place-items-center">주문번호 DM 보내기</a>
       <div class="mt-5 grid gap-2">
         <button id="doneToOrders" class="h-11 rounded-xl bg-navy text-white font-bold">내 주문 내역 확인</button>
         <button class="h-11 rounded-xl border border-slate-200 font-semibold" data-close>닫기</button>
@@ -291,7 +318,8 @@ const CONFIG = {
   // 토스 앱 > 전체 > 토스아이디 에서 만든 링크 (예: https://toss.me/아이디)
   tossLink: 'https://toss.me/YOUR_ID',
   bank: { name: '토스뱅크', number: '1000-0000-0000', holder: '홍길동' },
-  contactLink: 'https://open.kakao.com/o/YOUR_CHAT',
+  // 다운로드 링크를 DM 으로 보낼 판매자 인스타그램 아이디 (@ 제외)
+  instagramId: 'YOUR_INSTA_ID',
   // Supabase 연동 (둘 다 채우면 주문이 서버에 저장되고, 관리자 승인 시 PDF 가 이메일로 발송됨)
   supabase: { url: '', anonKey: '' },
 };
@@ -306,9 +334,9 @@ const PRODUCTS = [
 ];
 
 const METHOD_GUIDE = {
-  KAKAOPAY: '<b>카카오페이</b> 버튼을 누르면 송금 화면으로 이동합니다. <b>{amount}원</b>을 송금하시고, 메모란에 <b>입금자명</b>을 입력해 주세요.',
+  KAKAOPAY: '<b>카카오페이</b> 버튼을 누르면 송금 화면으로 이동합니다(PC에서는 QR 코드 스캔). <b>{amount}원</b>을 송금하시고, 메모란에 <b>입금자명</b>을 입력해 주세요.',
   BANK:     '아래 계좌를 누르면 계좌번호가 복사됩니다. 위에 입력하신 <b>입금자명</b>으로 <b>{amount}원</b>을 이체해 주세요. 입금자명이 다르면 확인이 늦어질 수 있습니다.',
-  TOSS:     '<b>토스</b> 버튼을 누르면 토스 송금 페이지로 이동합니다. <b>{amount}원</b>을 송금하신 뒤 이 화면으로 돌아와 확인 요청을 눌러 주세요.',
+  TOSS:     '<b>토스</b> 버튼을 누르면 토스 송금 페이지로 이동합니다(PC에서는 QR 코드 스캔). <b>{amount}원</b>을 송금하신 뒤 이 화면으로 돌아와 확인 요청을 눌러 주세요.',
 };
 const STATUS_LABEL = {
   PENDING:  { text: '입금 확인 중', cls: 'bg-amber-100 text-amber-700' },
@@ -327,6 +355,9 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const productById = (id) => PRODUCTS.find((p) => p.id === id);
 const productLabel = (p) => `${p.grade} ${p.subject} · ${p.book}`;
 const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+// ig.me 는 앱에서만 DM 창을 열어줌 → PC 에서는 프로필로 이동
+const instaDmUrl = (id) => (isMobile() ? `https://ig.me/m/${id}` : `https://www.instagram.com/${id}/`);
+const contactLabel = (o) => (o.deliveryMethod === 'INSTAGRAM' ? `@${o.instagramId}` : o.email);
 
 let toastTimer;
 function toast(msg) {
@@ -387,16 +418,18 @@ const api = {
   async createOrder(o) {
     const { data, error } = await sb.rpc('create_order', {
       p_buyer_name: o.buyerName,
-      p_email: o.email,
       p_product_id: o.subject,
       p_payment_method: o.paymentMethod,
+      p_delivery_method: o.deliveryMethod,
+      p_email: o.email || null,
+      p_instagram_id: o.instagramId || null,
       p_amount: o.amount,
     });
     if (error) throw error;
     return data; // { order_no, amount, status, created_at }
   },
-  async getStatus(orderNo, email) {
-    const { data, error } = await sb.rpc('get_order_status', { p_order_no: orderNo, p_email: email });
+  async getStatus(orderNo, contact) {
+    const { data, error } = await sb.rpc('get_order_status', { p_order_no: orderNo, p_contact: contact });
     if (error) throw error;
     return data; // 'PENDING' | 'APPROVED' | 'REJECTED' | null
   },
@@ -504,13 +537,21 @@ function openCheckout(productId) {
   if (productId) sel.value = productId;
   $('#formError').classList.add('hidden');
   updateAmount();
-  setMethod($('input[name="method"]:checked').value);
+  setDelivery($('input[name="delivery"]:checked').value);
   openModal('payModal');
-  if (!qrRendered && window.QRCode && CONFIG.kakaoPayLink) {
-    new QRCode($('#kakaoQR'), { text: CONFIG.kakaoPayLink, width: 140, height: 140 });
+  if (!qrRendered && window.QRCode) {
+    if (CONFIG.kakaoPayLink) new QRCode($('#kakaoQR'), { text: CONFIG.kakaoPayLink, width: 140, height: 140 });
+    if (CONFIG.tossLink) new QRCode($('#tossQR'), { text: CONFIG.tossLink, width: 140, height: 140 });
     qrRendered = true;
   }
 }
+
+function setDelivery(method) {
+  $$('.dlv-opt').forEach((el) => el.classList.toggle('dlv-active', el.dataset.delivery === method));
+  $$('[data-dlv-pane]').forEach((el) => el.classList.toggle('hidden', el.dataset.dlvPane !== method));
+}
+
+const normInsta = (v) => v.trim().replace(/^@/, '').toLowerCase();
 
 function currentAmount() { return productById($('#fSubject').value)?.price || 0; }
 
@@ -527,10 +568,16 @@ function setMethod(method) {
 
 function validate() {
   const name = $('#fName').value.trim();
-  const email = $('#fEmail').value.trim();
   if (!name) return '입금자명을 입력해 주세요.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return '이메일 주소 형식을 확인해 주세요.';
-  if (email.toLowerCase() !== $('#fEmail2').value.trim().toLowerCase()) return '이메일 주소가 서로 일치하지 않습니다.';
+  if ($('input[name="delivery"]:checked').value === 'INSTAGRAM') {
+    const id = normInsta($('#fInsta').value);
+    if (!id) return '인스타그램 아이디를 입력해 주세요.';
+    if (!/^(?!\.)(?!.*\.\.)(?!.*\.$)[a-z0-9._]{1,30}$/.test(id)) return '인스타그램 아이디는 영문, 숫자, 마침표(.), 밑줄(_)만 사용할 수 있습니다.';
+  } else {
+    const email = $('#fEmail').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return '이메일 주소 형식을 확인해 주세요.';
+    if (email.toLowerCase() !== $('#fEmail2').value.trim().toLowerCase()) return '이메일 주소가 서로 일치하지 않습니다.';
+  }
   if (!$('#fAgree').checked) return '송금 완료 및 이용 동의에 체크해 주세요.';
   return null;
 }
@@ -548,7 +595,9 @@ async function submitOrder() {
   const order = {
     orderNo: genOrderNo(),
     buyerName: $('#fName').value.trim(),
-    email: $('#fEmail').value.trim().toLowerCase(),
+    deliveryMethod: $('input[name="delivery"]:checked').value,
+    email: '',
+    instagramId: '',
     subject: $('#fSubject').value,
     paymentMethod: $('input[name="method"]:checked').value,
     amount: currentAmount(),
@@ -556,6 +605,8 @@ async function submitOrder() {
     createdAt: new Date().toISOString(),
     synced: false,
   };
+  if (order.deliveryMethod === 'INSTAGRAM') order.instagramId = normInsta($('#fInsta').value);
+  else order.email = $('#fEmail').value.trim().toLowerCase();
 
   try {
     if (sb) {
@@ -567,9 +618,18 @@ async function submitOrder() {
     saveOrders(orders);
 
     $('#payForm').reset();
+    setDelivery('EMAIL');
     closeModal($('#payModal'));
     $('#doneOrderNo').textContent = order.orderNo;
-    $('#doneEmail').textContent = order.email;
+    const dm = $('#doneInstaDM');
+    if (order.deliveryMethod === 'INSTAGRAM') {
+      $('#doneMsg').innerHTML = `입금이 확인되면 <b class="text-navy">@${esc(CONFIG.instagramId)}</b> 계정에서<br /><b class="text-navy">@${esc(order.instagramId)}</b>(으)로 다운로드 링크를 보내드립니다.<br />원활한 전달을 위해 주문번호를 DM으로 먼저 보내 주세요.`;
+      dm.href = instaDmUrl(CONFIG.instagramId);
+      dm.classList.remove('hidden');
+    } else {
+      $('#doneMsg').innerHTML = `입금이 확인되면 <b class="text-navy break-all">${esc(order.email)}</b>(으)로<br />풀버전 PDF를 보내드립니다.`;
+      dm.classList.add('hidden');
+    }
     openModal('doneModal');
   } catch (e) {
     console.error(e);
@@ -601,8 +661,10 @@ function renderOrders() {
         </div>
         <p class="mt-2 font-bold text-navy">${esc(p ? productLabel(p) : o.subject)}</p>
         <p class="text-xs text-slate-500 mt-1">${esc(o.buyerName)} · ${won(o.amount)}원 · ${new Date(o.createdAt).toLocaleString('ko-KR')}</p>
-        ${o.status === 'APPROVED' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed"><b>${esc(o.email)}</b>(으)로 PDF를 보내드렸습니다. 메일이 보이지 않으면 스팸함을 확인해 주세요.</p>` : ''}
-        ${o.status === 'REJECTED' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed">입금 내역을 확인하지 못했습니다. 입금자명과 금액을 확인하신 뒤 문의해 주세요.</p>` : ''}
+        <p class="text-xs text-slate-500">받는 곳: ${o.deliveryMethod === 'INSTAGRAM' ? '인스타그램 DM ' : '이메일 '}<b>${esc(contactLabel(o) || '-')}</b></p>
+        ${o.status === 'APPROVED' && o.deliveryMethod === 'INSTAGRAM' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed"><b>@${esc(CONFIG.instagramId)}</b> 계정에서 DM으로 다운로드 링크를 보내드립니다. 링크는 발급 후 5시간 동안 유효합니다. DM이 보이지 않으면 '메시지 요청'함을 확인해 주세요.</p>` : ''}
+        ${o.status === 'APPROVED' && o.deliveryMethod !== 'INSTAGRAM' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed"><b>${esc(o.email)}</b>(으)로 PDF를 보내드렸습니다. 메일이 보이지 않으면 스팸함을 확인해 주세요.</p>` : ''}
+        ${o.status === 'REJECTED' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed">입금 내역을 확인하지 못했습니다. 입금자명과 금액을 확인하신 뒤 인스타그램 <b>@${esc(CONFIG.instagramId)}</b>으로 문의해 주세요.</p>` : ''}
       </div>`;
   }).join('');
 }
@@ -611,7 +673,7 @@ async function refreshOrders() {
   if (!sb) { toast('입금이 확인되면 주문 상태가 변경됩니다.'); return; }
   const orders = loadOrders();
   await Promise.all(orders.filter((o) => o.synced).map(async (o) => {
-    try { o.status = (await api.getStatus(o.orderNo, o.email)) || o.status; } catch (e) { console.warn(e); }
+    try { o.status = (await api.getStatus(o.orderNo, o.email || o.instagramId)) || o.status; } catch (e) { console.warn(e); }
   }));
   saveOrders(orders);
   renderOrders();
@@ -634,7 +696,7 @@ function init() {
   $('#bankName').textContent = CONFIG.bank.name;
   $('#bankNumber').textContent = CONFIG.bank.number;
   $('#bankHolder').textContent = CONFIG.bank.holder;
-  $('#contactLink').href = CONFIG.contactLink;
+  $('#shopInsta1').textContent = '@' + CONFIG.instagramId;
   renderTabs();
   renderProducts();
   updateBadge();
@@ -662,6 +724,7 @@ function init() {
   $('#refreshOrders').onclick = refreshOrders;
   $('#fSubject').onchange = updateAmount;
   $$('input[name="method"]').forEach((r) => (r.onchange = () => setMethod(r.value)));
+  $$('input[name="delivery"]').forEach((r) => (r.onchange = () => setDelivery(r.value)));
   $('#copyAccount').onclick = async () => {
     await copyText(`${CONFIG.bank.name} ${CONFIG.bank.number.replace(/-/g, '')}`);
     toast('계좌번호가 복사되었습니다.');

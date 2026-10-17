@@ -55,6 +55,13 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let filter = 'PENDING';
 
+const ig = (id) => `@${esc(id)}`;
+// ig.me 는 앱에서만 DM 창을 열어줌 → PC 에서는 프로필로 이동
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const instaDmUrl = (id) => (isMobile ? `https://ig.me/m/${id}` : `https://www.instagram.com/${id}/`);
+const fmt = (t) => new Date(t).toLocaleString('ko-KR');
+let orders = {};
+
 async function load() {
   let q = sb.from('orders').select('*, products(title)').order('created_at', { ascending: false }).limit(200);
   if (filter !== 'ALL') q = q.eq('status', filter);
@@ -63,48 +70,105 @@ async function load() {
     b.className = `h-9 px-4 rounded-full border text-sm font-semibold ${b.dataset.f === filter ? 'bg-[#1e1b4b] text-white' : 'bg-white'}`;
   });
   if (error) { $('#list').innerHTML = `<p class="text-rose-600">${esc(error.message)}</p>`; return; }
+  orders = Object.fromEntries(data.map((o) => [o.order_no, o]));
   if (!data.length) { $('#list').innerHTML = '<p class="py-16 text-center text-slate-400">주문 없음</p>'; return; }
-  $('#list').innerHTML = data.map((o) => `
+  $('#list').innerHTML = data.map((o) => {
+    const insta = o.delivery_method === 'INSTAGRAM';
+    const contact = insta
+      ? `인스타 <a class="underline" href="https://www.instagram.com/${esc(o.instagram_id)}/" target="_blank" rel="noopener">${ig(o.instagram_id)}</a>`
+      : `메일 ${esc(o.email)}`;
+    return `
     <div class="bg-white rounded-xl border border-slate-100 p-4">
       <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
         <span class="font-mono">${esc(o.order_no)}</span>
-        <span>· ${new Date(o.created_at).toLocaleString('ko-KR')}</span>
+        <span>· ${fmt(o.created_at)}</span>
         <span class="ml-auto font-bold">${esc(o.status)}</span>
       </div>
       <p class="mt-2 font-bold text-[#1e1b4b]">${esc(o.buyer_name)} · ${Number(o.amount).toLocaleString('ko-KR')}원 <span class="text-sm font-semibold text-violet-600">${METHOD[o.payment_method]}</span></p>
-      <p class="text-sm text-slate-500">${esc(o.products?.title || o.product_id)} · ${esc(o.email)}</p>
-      ${o.status === 'APPROVED' ? deliveryLine(o) : ''}
+      <p class="text-sm text-slate-500">${esc(o.products?.title || o.product_id)} · ${contact}</p>
+      ${o.status === 'APPROVED' ? (insta ? instaBlock(o) : emailLine(o)) : ''}
       ${o.status === 'PENDING' ? `
         <div class="mt-3 grid grid-cols-2 gap-2">
-          <button data-act="APPROVED" data-id="${o.id}" class="h-10 rounded-xl bg-emerald-600 text-white font-bold">입금 확인 · PDF 발송</button>
+          <button data-act="APPROVED" data-id="${o.id}" class="h-10 rounded-xl bg-emerald-600 text-white font-bold">${insta ? '입금 확인 · 링크 발급' : '입금 확인 · PDF 발송'}</button>
           <button data-act="REJECTED" data-id="${o.id}" class="h-10 rounded-xl border border-slate-200 font-semibold">입금 미확인</button>
         </div>` : ''}
-      ${o.status === 'APPROVED' ? `<button data-resend="${esc(o.order_no)}" class="mt-3 h-9 px-4 rounded-xl border border-slate-200 text-sm font-semibold">PDF 메일 재발송</button>` : ''}
-    </div>`).join('');
+      ${o.status === 'APPROVED' && !insta ? `<button data-resend="${esc(o.order_no)}" class="mt-3 h-9 px-4 rounded-xl border border-slate-200 text-sm font-semibold">PDF 메일 재발송</button>` : ''}
+    </div>`;
+  }).join('');
 }
 
-function deliveryLine(o) {
-  if (o.delivered_at) return `<p class="mt-1 text-sm text-emerald-700">PDF 발송 완료 · ${new Date(o.delivered_at).toLocaleString('ko-KR')}</p>`;
+function emailLine(o) {
+  if (o.delivered_at) return `<p class="mt-1 text-sm text-emerald-700">PDF 발송 완료 · ${fmt(o.delivered_at)}</p>`;
   if (o.delivery_error) return `<p class="mt-1 text-sm text-rose-600">발송 실패: ${esc(o.delivery_error)}</p>`;
   return `<p class="mt-1 text-sm text-amber-600">발송 처리 중… (잠시 후 ↻ 새로고침)</p>`;
 }
 
+function instaBlock(o) {
+  if (o.delivery_error && !o.download_url) return `<p class="mt-1 text-sm text-rose-600">${esc(o.delivery_error)}</p>
+    <button data-resend="${esc(o.order_no)}" class="mt-2 h-9 px-4 rounded-xl border border-slate-200 text-sm font-semibold">링크 다시 발급</button>`;
+  if (!o.download_url) return `<p class="mt-1 text-sm text-amber-600">링크 발급 중… (잠시 후 ↻ 새로고침)</p>`;
+  const expired = new Date(o.download_expires_at) < new Date();
+  return `
+    <div class="mt-3 rounded-xl bg-slate-50 p-3 space-y-2">
+      <p class="text-xs ${expired ? 'text-rose-600 font-bold' : 'text-slate-500'}">
+        다운로드 링크 · ${expired ? '만료됨' : '만료'} ${fmt(o.download_expires_at)}
+        ${o.delivered_at ? `<span class="ml-1 text-emerald-700 font-bold">· DM 발송 완료 ${fmt(o.delivered_at)}</span>` : ''}
+      </p>
+      <input readonly value="${esc(o.download_url)}" class="w-full h-9 rounded-lg border border-slate-200 px-2 text-xs font-mono bg-white" onclick="this.select()" />
+      <div class="flex flex-wrap gap-2">
+        <button data-copy="${esc(o.order_no)}" class="h-9 px-3 rounded-lg bg-[#1e1b4b] text-white text-sm font-bold">DM 문구 복사</button>
+        <a href="${instaDmUrl(o.instagram_id)}" target="_blank" rel="noopener" class="h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold grid place-items-center">${ig(o.instagram_id)} DM 열기</a>
+        ${o.delivered_at ? '' : `<button data-sent="${o.id}" class="h-9 px-3 rounded-lg border border-emerald-300 text-emerald-700 text-sm font-semibold">DM 보냄 체크</button>`}
+        <button data-resend="${esc(o.order_no)}" class="h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold">링크 재발급</button>
+      </div>
+    </div>`;
+}
+
+function dmMessage(o) {
+  return [
+    `안녕하세요, 기말고사 문제은행입니다.`,
+    `주문번호 ${o.order_no} (${o.products?.title || o.product_id}) 입금이 확인되어 다운로드 링크를 보내드립니다.`,
+    ``,
+    o.download_url,
+    ``,
+    `링크는 ${fmt(o.download_expires_at)}까지 유효합니다. 기한 안에 내려받아 주세요.`,
+    `본 자료는 개인 학습용으로만 제공되며 무단 공유 및 재판매를 금지합니다. 감사합니다.`,
+  ].join('\n');
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch { prompt('아래 내용을 복사해 주세요.', text); return false; }
+}
+
 async function setStatus(id, status) {
-  if (!confirm(status === 'APPROVED' ? '입금 확인 후 승인하시겠습니까? 구매자 이메일로 PDF가 발송됩니다.' : '입금 미확인으로 처리하시겠습니까? 구매자에게 안내 메일이 발송됩니다.')) return;
+  const o = Object.values(orders).find((x) => x.id === id);
+  const insta = o?.delivery_method === 'INSTAGRAM';
+  const msg = status === 'APPROVED'
+    ? (insta ? '입금 확인 후 승인하시겠습니까? 5시간 유효한 다운로드 링크가 발급됩니다.' : '입금 확인 후 승인하시겠습니까? 구매자 이메일로 PDF가 발송됩니다.')
+    : (insta ? '입금 미확인으로 처리하시겠습니까? (인스타 주문은 안내 메일이 없으니 DM으로 직접 알려 주세요)' : '입금 미확인으로 처리하시겠습니까? 구매자에게 안내 메일이 발송됩니다.');
+  if (!confirm(msg)) return;
   const { error } = await sb.from('orders').update({ status }).eq('id', id);
   if (error) return alert(error.message);
   load();
-  if (status === 'APPROVED') setTimeout(load, 5000); // 웹훅 → 메일 발송 결과 반영
+  if (status === 'APPROVED') setTimeout(load, 5000); // 웹훅 → 발송/링크 발급 결과 반영
 }
 
 async function resend(orderNo, btn) {
-  if (!confirm(`${orderNo} 주문의 PDF를 다시 발송하시겠습니까?`)) return;
+  const insta = orders[orderNo]?.delivery_method === 'INSTAGRAM';
+  if (!confirm(insta ? `${orderNo} 주문의 다운로드 링크를 새로 발급하시겠습니까? (만료 시간이 지금부터 5시간으로 갱신됩니다)` : `${orderNo} 주문의 PDF를 다시 발송하시겠습니까?`)) return;
   btn.disabled = true;
-  btn.textContent = '발송 중…';
+  btn.textContent = '처리 중…';
   const { data, error } = await sb.functions.invoke('notify-order', { body: { action: 'resend', orderNo } });
-  let msg = data?.ok ? '재발송했습니다.' : data?.error;
+  let msg = data?.ok ? (insta ? '새 링크를 발급했습니다.' : '재발송했습니다.') : data?.error;
   if (error) { try { msg = (await error.context.json()).error; } catch { msg = error.message; } }
-  alert(msg || '재발송 실패');
+  alert(msg || '처리 실패');
+  load();
+}
+
+async function markSent(id) {
+  const { error } = await sb.from('orders').update({ delivered_at: new Date().toISOString() }).eq('id', id);
+  if (error) return alert(error.message);
   load();
 }
 
@@ -131,6 +195,10 @@ document.addEventListener('click', async (e) => {
   if (a) setStatus(a.dataset.id, a.dataset.act);
   const r = e.target.closest('[data-resend]');
   if (r) resend(r.dataset.resend, r);
+  const c = e.target.closest('[data-copy]');
+  if (c && (await copyText(dmMessage(orders[c.dataset.copy])))) c.textContent = '복사됨 ✓';
+  const sent = e.target.closest('[data-sent]');
+  if (sent) markSent(sent.dataset.sent);
 });
 
 showSession();
