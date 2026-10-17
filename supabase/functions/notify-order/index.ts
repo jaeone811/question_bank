@@ -78,7 +78,11 @@ async function appendSheet(o: Order) {
   if (!res.ok) console.error("Google Sheet 실패", res.status);
 }
 
-const safeFileName = (title: string) => `${title.replace(/[\\/:*?"<>|]/g, "")}.pdf`;
+type Product = { title: string; grade: string | null; subject: string | null; file_path: string | null };
+
+// '고1 영어 · 패키지명' (학년/과목이 없으면 패키지명만)
+const productLabel = (p: Product) => [[p.grade, p.subject].filter(Boolean).join(" "), p.title].filter(Boolean).join(" · ");
+const safeFileName = (p: Product) => `${productLabel(p).replace(/[\\/:*?"<>|]/g, "")}.pdf`;
 
 type DeliverResult = { ok: boolean; error?: string; url?: string; expiresAt?: string };
 
@@ -86,24 +90,29 @@ type DeliverResult = { ok: boolean; error?: string; url?: string; expiresAt?: st
 async function deliverPdf(orderNo: string): Promise<DeliverResult> {
   const { data: o, error } = await db
     .from("orders")
-    .select("order_no, buyer_name, email, instagram_id, delivery_method, status, products(title, file_path)")
+    .select("order_no, buyer_name, email, instagram_id, delivery_method, status, products(title, grade, subject, file_path)")
     .eq("order_no", orderNo)
     .single();
   if (error || !o) return { ok: false, error: "주문을 찾을 수 없음" };
   if (o.status !== "APPROVED") return { ok: false, error: "승인되지 않은 주문" };
 
   // deno-lint-ignore no-explicit-any
-  const product = o.products as any as { title: string; file_path: string };
+  const product = o.products as any as Product;
+  if (!product.file_path) {
+    const msg = "이 패키지에 풀버전 PDF가 업로드되지 않았습니다";
+    await db.from("orders").update({ delivery_error: msg }).eq("order_no", orderNo);
+    return { ok: false, error: msg };
+  }
   return o.delivery_method === "INSTAGRAM"
     ? await issueDownloadLink(orderNo, product)
     : await emailPdf(o.order_no, o.buyer_name, o.email!, product);
 }
 
 // INSTAGRAM: 5시간 후 만료되는 다운로드 링크 생성 (DM 은 관리자가 직접 보냄)
-async function issueDownloadLink(orderNo: string, product: { title: string; file_path: string }): Promise<DeliverResult> {
+async function issueDownloadLink(orderNo: string, product: Product): Promise<DeliverResult> {
   const { data, error } = await db.storage
     .from(BUCKET)
-    .createSignedUrl(product.file_path, INSTAGRAM_LINK_TTL, { download: safeFileName(product.title) });
+    .createSignedUrl(product.file_path!, INSTAGRAM_LINK_TTL, { download: safeFileName(product) });
   if (error || !data) {
     const msg = `링크 생성 실패: ${error?.message ?? product.file_path}`;
     await db.from("orders").update({ delivery_error: msg }).eq("order_no", orderNo);
@@ -122,26 +131,26 @@ async function emailPdf(
   orderNo: string,
   buyerName: string,
   email: string,
-  product: { title: string; file_path: string },
+  product: Product,
 ): Promise<DeliverResult> {
   try {
-    const { data: file, error: dlErr } = await db.storage.from(BUCKET).download(product.file_path);
+    const { data: file, error: dlErr } = await db.storage.from(BUCKET).download(product.file_path!);
     if (dlErr || !file) throw new Error(`PDF 파일 없음: ${product.file_path}`);
     const content = encodeBase64(new Uint8Array(await file.arrayBuffer()));
 
     await sendMail(
       email,
-      `[기말고사 문제은행] ${product.title} 자료를 보내드립니다`,
+      `[기말고사 문제은행] ${productLabel(product)} 자료를 보내드립니다`,
       `<p>${esc(buyerName)}님, 안녕하세요. 기말고사 문제은행입니다.</p>
        <p>입금이 확인되어 구매하신 자료를 첨부해 보내드립니다.</p>
        <table cellpadding="6" style="border-collapse:collapse">
          <tr><td style="color:#64748b">주문번호</td><td><b>${esc(orderNo)}</b></td></tr>
-         <tr><td style="color:#64748b">자료</td><td>${esc(product.title)}</td></tr>
+         <tr><td style="color:#64748b">자료</td><td>${esc(productLabel(product))}</td></tr>
        </table>
        <p>첨부파일이 보이지 않으면 이 메일에 회신해 주세요.</p>
        <p style="color:#94a3b8;font-size:12px">본 자료는 구매하신 분의 개인 학습용으로만 제공됩니다. 무단 공유 및 재판매를 금지합니다.</p>
        <p>시험 잘 보시길 바랍니다. 감사합니다.</p>`,
-      [{ filename: safeFileName(product.title), content }],
+      [{ filename: safeFileName(product), content }],
     );
     await db.from("orders").update({ delivered_at: new Date().toISOString(), delivery_error: null }).eq("order_no", orderNo);
     return { ok: true };
@@ -167,6 +176,8 @@ async function handleWebhook(payload: WebhookPayload) {
   if (payload.table !== "orders" || !o) return;
 
   if (payload.type === "INSERT") {
+    const { data: p } = await db.from("products").select("title, grade, subject, file_path").eq("id", o.product_id).maybeSingle();
+    const productName = p ? productLabel(p as Product) : o.product_id;
     await Promise.all([
       sendMail(
         env("ADMIN_EMAIL"),
@@ -178,7 +189,7 @@ async function handleWebhook(payload: WebhookPayload) {
            <tr><td>받는 방법</td><td>${
              o.delivery_method === "INSTAGRAM" ? `인스타그램 DM (@${esc(o.instagram_id ?? "")})` : `이메일 (${esc(o.email ?? "")})`
            }</td></tr>
-           <tr><td>상품</td><td>${esc(o.product_id)}</td></tr>
+           <tr><td>패키지</td><td>${esc(productName)}</td></tr>
            <tr><td>금액</td><td>${won(o.amount)}원</td></tr>
            <tr><td>방식</td><td>${METHOD_LABEL[o.payment_method]}</td></tr>
          </table>

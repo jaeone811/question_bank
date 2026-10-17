@@ -4,9 +4,9 @@
 
 ```
 index.html                         # 프론트 (단일 파일, Tailwind CDN + Vanilla JS)
-admin.html                         # 관리자 승인 페이지
-samples/                           # 무료 샘플 PDF (공개)
-supabase/schema.sql                # 테이블 · RLS · RPC · 비공개 버킷
+admin.html                         # 관리자 페이지 (주문 승인 · 패키지 등록/수정 · PDF 업로드)
+samples/                           # Supabase 미연동 시 쓰는 샘플 PDF (연동하면 관리자 페이지에서 업로드)
+supabase/schema.sql                # 테이블 · RLS · RPC · Storage 버킷/정책
 supabase/webhooks.sql              # 주문 INSERT/UPDATE → notify-order 호출 트리거
 supabase/functions/notify-order    # 관리자 알림 · PDF 첨부 메일 · 인스타용 다운로드 링크 · 재발송 · 구글 시트
 integrations/google-sheet.gs       # (선택) 구글 시트 Apps Script
@@ -21,15 +21,14 @@ integrations/google-sheet.gs       # (선택) 구글 시트 Apps Script
 - `tossLink`: 토스아이디 링크 (`https://toss.me/아이디`) — PC 에선 QR 로 표시
 - `instagramId`: 다운로드 링크를 DM 으로 보낼 판매자 인스타 아이디
 - `bank`: 은행명 / 계좌번호 / 예금주
-- `PRODUCTS`: 상품 목록, `samples/` 에 샘플 PDF
+- `PRODUCTS`: 기본 패키지 목록, `samples/` 에 샘플 PDF (Supabase 연동하면 무시되고 DB 패키지를 불러옴)
 
 ## 2. Supabase 붙이기
 
 1. 프로젝트 생성 → **SQL Editor** 에서 `supabase/schema.sql` 실행
-2. **Storage > products**(비공개 버킷)에 풀버전 PDF 업로드 — 경로는 `products.file_path` 와 동일 (예: `h1-eng/full.pdf`)
-3. **Authentication > Users** 에서 관리자 계정 생성 후
+2. **Authentication > Users** 에서 관리자 계정 생성 후
    `insert into public.admins (user_id) values ('<UUID>');`
-4. Edge Function 배포
+3. Edge Function 배포
    ```bash
    supabase secrets set WEBHOOK_SECRET=<랜덤문자열> RESEND_API_KEY=re_xxx \
      ADMIN_EMAIL=me@example.com MAIL_FROM="기말고사 문제은행 <noreply@yourdomain.com>" \
@@ -37,8 +36,24 @@ integrations/google-sheet.gs       # (선택) 구글 시트 Apps Script
    # (선택) GOOGLE_SHEET_WEBHOOK=<Apps Script /exec URL>, ALLOWED_ORIGIN=https://your-site.com
    supabase functions deploy notify-order --no-verify-jwt
    ```
-5. **Database > Webhooks** 활성화 후 `supabase/webhooks.sql` 의 `<PROJECT_REF>`, `<WEBHOOK_SECRET>` 채워서 실행 (또는 대시보드 GUI 로 동일하게 생성)
-6. `index.html` 의 `CONFIG.supabase`, `admin.html` 상단에 Project URL / anon key 입력
+4. **Database > Webhooks** 활성화 후 `supabase/webhooks.sql` 의 `<PROJECT_REF>`, `<WEBHOOK_SECRET>` 채워서 실행 (또는 대시보드 GUI 로 동일하게 생성)
+5. `index.html` 의 `CONFIG.supabase`, `admin.html` 상단에 Project URL / anon key 입력
+6. `admin.html` > **패키지 관리** 에서 패키지를 만들고 풀버전·샘플 PDF 업로드
+   (schema.sql 이 예시 패키지 6개를 넣어두는데, 풀버전을 올리기 전까진 사이트에 안 보임. 필요 없으면 삭제)
+
+## 패키지 관리
+
+| 항목 | 설명 |
+| --- | --- |
+| 패키지 이름 · 학년 · 과목 | 사이트 카드와 메일에 `고1 영어 · 패키지 이름` 형태로 표시 |
+| 가격 · 문항 수 · 설명 · 표시 순서 | 카드에 표시. 주문 금액은 서버가 이 가격으로 계산 |
+| 판매 중 | 끄면 사이트에서 숨김 (기존 주문은 그대로) |
+| 풀버전 PDF | 비공개 버킷 `products/<패키지ID>/full-<시각>.pdf`. **업로드돼야 사이트에 표시되고 주문 가능** |
+| 무료 샘플 PDF | 공개 버킷 `samples/<패키지ID>/sample-<시각>.pdf`. 없으면 카드에 "샘플 준비 중" |
+
+- 파일을 교체하면 새 경로로 올린 뒤 이전 파일을 지움 (샘플 캐시 꼬임 방지)
+- 업로드 한도: Supabase 무료 플랜 파일당 50MB. 이메일 첨부는 원본 약 30MB 까지라 그보다 크면 경고
+- 주문이 들어온 패키지는 삭제 불가 → 판매 중지로 처리
 
 ## 흐름
 

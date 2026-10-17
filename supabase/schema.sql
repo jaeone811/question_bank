@@ -3,15 +3,44 @@
 -- Supabase Dashboard > SQL Editor 에 통째로 붙여넣고 Run
 -- =========================================================
 
--- ---------- 1. 상품 ----------
+-- ---------- 1. 패키지(상품) ----------
+-- 관리자 페이지 > 패키지 관리 에서 추가/수정/PDF 업로드
 create table if not exists public.products (
-  id          text primary key,                -- 프론트 PRODUCTS[].id 와 동일 (예: 'h1-eng')
-  title       text not null,
+  id          text primary key default ('p-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 10)),
+  title       text not null check (char_length(title) between 1 and 60),  -- 패키지 이름 (예: '능률(민병천) 1~4과')
+  grade       text,                            -- 학년 (예: '고1')
+  subject     text,                            -- 과목 (예: '영어')
+  description text,                            -- 패키지 설명
+  item_count  integer check (item_count is null or item_count >= 0),  -- 문항 수
   price       integer not null check (price > 0),
-  file_path   text not null,                   -- 비공개 Storage 버킷 'products' 안의 경로 (예: 'h1-eng/full.pdf')
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now()
+  file_path   text,                            -- 풀버전 PDF: 비공개 버킷 'products' 안의 경로 (업로드 전엔 null)
+  sample_path text,                            -- 무료 샘플 PDF: 공개 버킷 'samples' 안의 경로
+  sort_order  integer not null default 0,      -- 작을수록 앞에 표시
+  is_active   boolean not null default true,   -- 판매 중 여부
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
+-- 이전 버전에서 업그레이드하는 경우
+alter table public.products alter column file_path drop not null;
+alter table public.products alter column id set default ('p-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
+alter table public.products add column if not exists grade text;
+alter table public.products add column if not exists subject text;
+alter table public.products add column if not exists description text;
+alter table public.products add column if not exists item_count integer check (item_count is null or item_count >= 0);
+alter table public.products add column if not exists sample_path text;
+alter table public.products add column if not exists sort_order integer not null default 0;
+alter table public.products add column if not exists updated_at timestamptz not null default now();
+
+create or replace function public.touch_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+
+drop trigger if exists trg_products_updated_at on public.products;
+create trigger trg_products_updated_at before update on public.products
+  for each row execute function public.touch_updated_at();
 
 -- ---------- 2. 주문 ----------
 create table if not exists public.orders (
@@ -74,9 +103,11 @@ alter table public.products enable row level security;
 alter table public.orders   enable row level security;
 alter table public.admins   enable row level security;
 
--- 상품: 활성 상품은 누구나 조회 가능 (file_path 는 비공개 버킷이라 노출돼도 접근 불가)
+-- 패키지: '판매 중 + 풀버전 PDF 업로드 완료'인 것만 누구나 조회 가능 (관리자는 전부)
+-- (file_path 가 보여도 비공개 버킷이라 파일에는 접근 불가)
 drop policy if exists "products read" on public.products;
-create policy "products read" on public.products for select using (is_active or public.is_admin());
+create policy "products read" on public.products for select
+  using ((is_active and file_path is not null) or public.is_admin());
 drop policy if exists "products admin write" on public.products;
 create policy "products admin write" on public.products for all
   using (public.is_admin()) with check (public.is_admin());
@@ -124,7 +155,8 @@ declare
   v_price integer;
   v_row   public.orders;
 begin
-  select price into v_price from public.products where id = p_product_id and is_active;
+  select price into v_price from public.products
+   where id = p_product_id and is_active and file_path is not null;
   if v_price is null then
     raise exception 'INVALID_PRODUCT';
   end if;
@@ -172,18 +204,25 @@ revoke all on function public.get_order_status(text, text)               from pu
 grant execute on function public.create_order(text, text, text, text, text, text, integer) to anon, authenticated;
 grant execute on function public.get_order_status(text, text)               to anon, authenticated;
 
--- ---------- 10. 비공개 Storage 버킷 ----------
--- 정책을 하나도 안 만들면 anon/authenticated 는 접근 불가, service_role(Edge Function)만 읽을 수 있음
-insert into storage.buckets (id, name, public)
-values ('products', 'products', false)
-on conflict (id) do nothing;
+-- ---------- 10. Storage 버킷 ----------
+-- products: 풀버전 PDF (비공개 — Edge Function 의 service_role 만 꺼낼 수 있음)
+-- samples : 무료 샘플 PDF (공개 — 누구나 URL 로 열람)
+insert into storage.buckets (id, name, public) values ('products', 'products', false) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('samples',  'samples',  true)  on conflict (id) do nothing;
 
--- ---------- 11. 샘플 상품 데이터 (프론트 PRODUCTS 와 맞춰서 수정) ----------
-insert into public.products (id, title, price, file_path) values
-  ('h1-eng',  '고1 영어 · 능률(민병천) 1~4과',      9900,  'h1-eng/full.pdf'),
-  ('h1-kor',  '고1 국어 · 비상(박영민) 문학·비문학', 8900,  'h1-kor/full.pdf'),
-  ('h1-math', '고1 수학 · 공통수학1 다항식~방정식',  9900,  'h1-math/full.pdf'),
-  ('h2-kor',  '고2 국어 · 문학 (천재 김동환)',       10900, 'h2-kor/full.pdf'),
-  ('h2-eng',  '고2 영어 · 영어Ⅰ 모의고사 변형',     10900, 'h2-eng/full.pdf'),
-  ('h3-eng',  '고3 영어 · 수능특강 영어 변형',       12900, 'h3-eng/full.pdf')
-on conflict (id) do update set title = excluded.title, price = excluded.price, file_path = excluded.file_path;
+-- 관리자만 두 버킷에 업로드/교체/삭제 가능
+drop policy if exists "admin manage pdfs" on storage.objects;
+create policy "admin manage pdfs" on storage.objects for all to authenticated
+  using (bucket_id in ('products', 'samples') and public.is_admin())
+  with check (bucket_id in ('products', 'samples') and public.is_admin());
+
+-- ---------- 11. 예시 패키지 (관리자 페이지에서 PDF 를 올리기 전까지는 사이트에 안 보임) ----------
+-- 이미 있는 패키지는 건드리지 않음 (관리자 페이지에서 수정한 내용 보존)
+insert into public.products (id, grade, subject, title, description, item_count, price, sort_order) values
+  ('h1-eng',  '고1', '영어', '능률(민병천) 1~4과',      '본문 변형, 어법·어휘, 빈칸, 순서·삽입 유형을 과별로 정리했습니다.', 180, 9900,  10),
+  ('h1-kor',  '고1', '국어', '비상(박영민) 문학·비문학', '교과서 수록 작품과 지문을 바탕으로 한 서술형 포함 변형 문제입니다.', 150, 8900,  20),
+  ('h1-math', '고1', '수학', '공통수학1 다항식~방정식',  '단원별 기본·심화 문항과 학교 기출 유형 변형을 담았습니다.',       200, 9900,  30),
+  ('h2-kor',  '고2', '국어', '문학 (천재 김동환)',       '현대시·고전시가·소설 작품별 핵심 개념과 변형 문제입니다.',       160, 10900, 40),
+  ('h2-eng',  '고2', '영어', '영어Ⅰ 모의고사 변형',     '최근 모의고사 지문을 내신형으로 변형한 문제입니다.',             220, 10900, 50),
+  ('h3-eng',  '고3', '영어', '수능특강 영어 변형',       '수능특강 지문별 주제·요지, 어법, 빈칸, 서술형 변형 문제입니다.', 300, 12900, 60)
+on conflict (id) do nothing;

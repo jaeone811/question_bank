@@ -28,6 +28,12 @@
       <button class="w-full h-11 rounded-xl bg-[#1e1b4b] text-white font-bold">로그인</button>
     </form>
 
+    <!-- 탭 -->
+    <nav id="views" class="hidden mb-4 grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100 max-w-sm">
+      <button data-view="orders"   class="h-9 rounded-lg text-sm font-bold">주문 관리</button>
+      <button data-view="products" class="h-9 rounded-lg text-sm font-bold">패키지 관리</button>
+    </nav>
+
     <!-- 주문 목록 -->
     <section id="dash" class="hidden">
       <div class="flex gap-2 overflow-x-auto" id="filters">
@@ -39,7 +45,81 @@
       </div>
       <div id="list" class="mt-4 space-y-3"></div>
     </section>
+
+    <!-- 패키지 관리 -->
+    <section id="pkgView" class="hidden">
+      <div class="flex items-center gap-2">
+        <p class="text-sm text-slate-500">사이트에는 <b>판매 중</b>이면서 <b>풀버전 PDF가 업로드된</b> 패키지만 표시됩니다.</p>
+        <button id="newPkg" class="ml-auto shrink-0 h-9 px-4 rounded-full bg-[#1e1b4b] text-white text-sm font-bold">+ 새 패키지</button>
+      </div>
+      <div id="pkgList" class="mt-4 space-y-3"></div>
+    </section>
   </main>
+
+  <!-- 패키지 편집 -->
+  <div id="pkgModal" class="hidden fixed inset-0 z-40 bg-black/50 items-end md:items-center justify-center">
+    <form id="pkgForm" class="w-full md:max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl md:rounded-2xl p-5 space-y-4" novalidate>
+      <div class="flex items-center justify-between">
+        <h2 id="pkgFormTitle" class="text-lg font-extrabold text-[#1e1b4b]">새 패키지</h2>
+        <button type="button" data-pkg-close class="w-9 h-9 rounded-full hover:bg-slate-100 text-xl" aria-label="닫기">×</button>
+      </div>
+      <label class="block">
+        <span class="text-xs font-semibold text-slate-500">패키지 이름 *</span>
+        <input id="pTitle" maxlength="60" placeholder="예: 능률(민병천) 1~4과" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+      </label>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="block">
+          <span class="text-xs font-semibold text-slate-500">학년</span>
+          <input id="pGrade" list="gradeList" maxlength="10" placeholder="예: 고1" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+        </label>
+        <label class="block">
+          <span class="text-xs font-semibold text-slate-500">과목</span>
+          <input id="pSubject" list="subjectList" maxlength="20" placeholder="예: 영어" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+        </label>
+        <label class="block">
+          <span class="text-xs font-semibold text-slate-500">가격(원) *</span>
+          <input id="pPrice" type="number" min="100" step="100" inputmode="numeric" placeholder="9900" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+        </label>
+        <label class="block">
+          <span class="text-xs font-semibold text-slate-500">문항 수</span>
+          <input id="pItems" type="number" min="0" inputmode="numeric" placeholder="180" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+        </label>
+      </div>
+      <datalist id="gradeList"><option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3"></datalist>
+      <datalist id="subjectList"><option value="국어"><option value="영어"><option value="수학"><option value="사회"><option value="과학"><option value="한국사"></datalist>
+      <label class="block">
+        <span class="text-xs font-semibold text-slate-500">설명</span>
+        <textarea id="pDesc" rows="3" maxlength="300" placeholder="사이트 카드에 표시되는 설명입니다." class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"></textarea>
+      </label>
+      <div class="grid grid-cols-2 gap-3 items-end">
+        <label class="block">
+          <span class="text-xs font-semibold text-slate-500">표시 순서 (작을수록 앞)</span>
+          <input id="pSort" type="number" inputmode="numeric" value="0" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+        </label>
+        <label class="flex items-center gap-2 h-11 text-sm font-semibold">
+          <input id="pActive" type="checkbox" class="w-5 h-5 accent-[#1e1b4b]" checked /> 판매 중
+        </label>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-3 space-y-2">
+        <p class="text-sm font-bold text-[#1e1b4b]">풀버전 PDF <span class="text-xs font-normal text-slate-400">(비공개 · 구매자에게만 전달)</span></p>
+        <p id="pFullCur" class="text-xs text-slate-500">업로드된 파일 없음</p>
+        <input id="pFull" type="file" accept="application/pdf,.pdf" class="block w-full text-sm" />
+      </div>
+      <div class="rounded-xl border border-slate-200 p-3 space-y-2">
+        <p class="text-sm font-bold text-[#1e1b4b]">무료 샘플 PDF <span class="text-xs font-normal text-slate-400">(공개 · 사이트에서 누구나 열람)</span></p>
+        <p id="pSampleCur" class="text-xs text-slate-500">업로드된 파일 없음</p>
+        <input id="pSample" type="file" accept="application/pdf,.pdf" class="block w-full text-sm" />
+        <label id="pSampleDelWrap" class="hidden items-center gap-2 text-xs text-rose-600"><input id="pSampleDel" type="checkbox" /> 기존 샘플 삭제</label>
+      </div>
+
+      <p id="pErr" class="text-sm text-rose-600 font-semibold"></p>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" data-pkg-close class="h-11 rounded-xl border border-slate-200 font-semibold">취소</button>
+        <button id="pSave" class="h-11 rounded-xl bg-[#1e1b4b] text-white font-bold disabled:opacity-50">저장</button>
+      </div>
+    </form>
+  </div>
 
 <script>
 const SUPABASE_URL = '';      // index.html CONFIG.supabase 와 동일
@@ -60,10 +140,12 @@ const ig = (id) => `@${esc(id)}`;
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const instaDmUrl = (id) => (isMobile ? `https://ig.me/m/${id}` : `https://www.instagram.com/${id}/`);
 const fmt = (t) => new Date(t).toLocaleString('ko-KR');
+const won = (n) => Number(n).toLocaleString('ko-KR');
+const productLabel = (p) => [[p.grade, p.subject].filter(Boolean).join(' '), p.title].filter(Boolean).join(' · ');
 let orders = {};
 
 async function load() {
-  let q = sb.from('orders').select('*, products(title)').order('created_at', { ascending: false }).limit(200);
+  let q = sb.from('orders').select('*, products(title, grade, subject)').order('created_at', { ascending: false }).limit(200);
   if (filter !== 'ALL') q = q.eq('status', filter);
   const { data, error } = await q;
   document.querySelectorAll('[data-f]').forEach((b) => {
@@ -85,7 +167,7 @@ async function load() {
         <span class="ml-auto font-bold">${esc(o.status)}</span>
       </div>
       <p class="mt-2 font-bold text-[#1e1b4b]">${esc(o.buyer_name)} · ${Number(o.amount).toLocaleString('ko-KR')}원 <span class="text-sm font-semibold text-violet-600">${METHOD[o.payment_method]}</span></p>
-      <p class="text-sm text-slate-500">${esc(o.products?.title || o.product_id)} · ${contact}</p>
+      <p class="text-sm text-slate-500">${esc(o.products ? productLabel(o.products) : o.product_id)} · ${contact}</p>
       ${o.status === 'APPROVED' ? (insta ? instaBlock(o) : emailLine(o)) : ''}
       ${o.status === 'PENDING' ? `
         <div class="mt-3 grid grid-cols-2 gap-2">
@@ -127,7 +209,7 @@ function instaBlock(o) {
 function dmMessage(o) {
   return [
     `안녕하세요, 기말고사 문제은행입니다.`,
-    `주문번호 ${o.order_no} (${o.products?.title || o.product_id}) 입금이 확인되어 다운로드 링크를 보내드립니다.`,
+    `주문번호 ${o.order_no} (${o.products ? productLabel(o.products) : o.product_id}) 입금이 확인되어 다운로드 링크를 보내드립니다.`,
     ``,
     o.download_url,
     ``,
@@ -172,12 +254,190 @@ async function markSent(id) {
   load();
 }
 
+/* ===================== 패키지 관리 ===================== */
+const MAX_MB = 50;          // Supabase 무료 플랜 파일 1개 최대 크기
+const EMAIL_SAFE_MB = 30;   // Resend 40MB(base64 포함) 한도 → 원본 약 30MB
+let products = [];
+let editingId = null;
+
+async function loadProducts() {
+  const { data, error } = await sb.from('products').select('*').order('sort_order').order('created_at');
+  if (error) { $('#pkgList').innerHTML = `<p class="text-rose-600">${esc(error.message)}</p>`; return; }
+  products = data;
+  if (!data.length) { $('#pkgList').innerHTML = '<p class="py-16 text-center text-slate-400">등록된 패키지가 없습니다. "+ 새 패키지"로 추가해 주세요.</p>'; return; }
+  $('#pkgList').innerHTML = data.map((p) => {
+    const badge = !p.is_active
+      ? '<span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">판매 중지</span>'
+      : !p.file_path
+        ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">PDF 미업로드 · 사이트 숨김</span>'
+        : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">판매 중</span>';
+    return `
+    <div class="bg-white rounded-xl border border-slate-100 p-4">
+      <div class="flex flex-wrap items-center gap-2 text-xs font-bold">
+        ${badge}
+        <span class="ml-auto font-normal text-slate-400">순서 ${p.sort_order} · <span class="font-mono">${esc(p.id)}</span></span>
+      </div>
+      <p class="mt-2 font-bold text-[#1e1b4b]">${esc(productLabel(p))}</p>
+      <p class="text-sm text-slate-500">${won(p.price)}원${p.item_count ? ` · ${won(p.item_count)}문항` : ''}</p>
+      ${p.description ? `<p class="mt-1 text-sm text-slate-500 whitespace-pre-line">${esc(p.description)}</p>` : ''}
+      <p class="mt-2 text-xs ${p.file_path ? 'text-emerald-700' : 'text-rose-600'}">풀버전 ${p.file_path ? '업로드됨' : '없음'} · <span class="${p.sample_path ? 'text-emerald-700' : 'text-slate-400'}">샘플 ${p.sample_path ? '업로드됨' : '없음'}</span></p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button data-pkg-edit="${esc(p.id)}" class="h-9 px-4 rounded-lg bg-[#1e1b4b] text-white text-sm font-bold">수정 · PDF 업로드</button>
+        <button data-pkg-toggle="${esc(p.id)}" class="h-9 px-4 rounded-lg border border-slate-200 text-sm font-semibold">${p.is_active ? '판매 중지' : '판매 재개'}</button>
+        <button data-pkg-del="${esc(p.id)}" class="h-9 px-4 rounded-lg border border-rose-200 text-rose-600 text-sm font-semibold">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+const fileName = (path) => (path ? path.split('/').pop() : '');
+
+function openPkg(id) {
+  editingId = id || null;
+  const p = products.find((x) => x.id === id) || { title: '', grade: '', subject: '', price: '', item_count: '', description: '', sort_order: (products.at(-1)?.sort_order ?? 0) + 10, is_active: true };
+  $('#pkgFormTitle').textContent = id ? '패키지 수정' : '새 패키지';
+  $('#pTitle').value = p.title;
+  $('#pGrade').value = p.grade ?? '';
+  $('#pSubject').value = p.subject ?? '';
+  $('#pPrice').value = p.price;
+  $('#pItems').value = p.item_count ?? '';
+  $('#pDesc').value = p.description ?? '';
+  $('#pSort').value = p.sort_order;
+  $('#pActive').checked = p.is_active;
+  $('#pFull').value = '';
+  $('#pSample').value = '';
+  $('#pSampleDel').checked = false;
+  $('#pFullCur').textContent = p.file_path ? `현재 파일: ${fileName(p.file_path)} (새 파일을 고르면 교체됩니다)` : '업로드된 파일 없음 — 업로드해야 사이트에 표시됩니다';
+  $('#pSampleCur').textContent = p.sample_path ? `현재 파일: ${fileName(p.sample_path)} (새 파일을 고르면 교체됩니다)` : '업로드된 파일 없음';
+  $('#pSampleDelWrap').classList.toggle('hidden', !p.sample_path);
+  $('#pSampleDelWrap').classList.toggle('flex', !!p.sample_path);
+  $('#pErr').textContent = '';
+  $('#pkgModal').classList.remove('hidden');
+  $('#pkgModal').classList.add('flex');
+}
+
+function closePkg() {
+  $('#pkgModal').classList.add('hidden');
+  $('#pkgModal').classList.remove('flex');
+}
+
+function checkPdf(file, label) {
+  if (!file) return null;
+  if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) return `${label}: PDF 파일만 올릴 수 있습니다.`;
+  if (file.size > MAX_MB * 1024 * 1024) return `${label}: ${MAX_MB}MB 이하만 올릴 수 있습니다.`;
+  return null;
+}
+
+// 새 경로로 올리고(캐시 꼬임 방지) 성공하면 이전 파일 삭제
+async function uploadPdf(bucket, id, kind, file, oldPath) {
+  const path = `${id}/${kind}-${Date.now()}.pdf`;
+  const { error } = await sb.storage.from(bucket).upload(path, file, { contentType: 'application/pdf', cacheControl: '3600' });
+  if (error) throw new Error(`${kind === 'full' ? '풀버전' : '샘플'} 업로드 실패: ${error.message}`);
+  if (oldPath) await sb.storage.from(bucket).remove([oldPath]);
+  return path;
+}
+
+async function savePkg(e) {
+  e.preventDefault();
+  const err = (m) => { $('#pErr').textContent = m; };
+  const title = $('#pTitle').value.trim();
+  const price = parseInt($('#pPrice').value, 10);
+  const items = $('#pItems').value === '' ? null : parseInt($('#pItems').value, 10);
+  const full = $('#pFull').files[0];
+  const sample = $('#pSample').files[0];
+  if (!title) return err('패키지 이름을 입력해 주세요.');
+  if (!(price > 0)) return err('가격을 올바르게 입력해 주세요.');
+  if (items !== null && !(items >= 0)) return err('문항 수를 올바르게 입력해 주세요.');
+  const fileErr = checkPdf(full, '풀버전') || checkPdf(sample, '샘플');
+  if (fileErr) return err(fileErr);
+  if (full && full.size > EMAIL_SAFE_MB * 1024 * 1024 &&
+      !confirm(`풀버전이 ${EMAIL_SAFE_MB}MB를 넘어 이메일 첨부 발송이 실패할 수 있습니다(인스타 링크는 정상). 계속할까요?`)) return;
+
+  const btn = $('#pSave');
+  btn.disabled = true;
+  btn.textContent = '저장 중…';
+  try {
+    const row = {
+      title,
+      grade: $('#pGrade').value.trim() || null,
+      subject: $('#pSubject').value.trim() || null,
+      description: $('#pDesc').value.trim() || null,
+      item_count: items,
+      price,
+      sort_order: parseInt($('#pSort').value, 10) || 0,
+      is_active: $('#pActive').checked,
+    };
+    let id = editingId;
+    if (id) {
+      const { error } = await sb.from('products').update(row).eq('id', id);
+      if (error) throw error;
+    } else {
+      const { data, error } = await sb.from('products').insert(row).select('id').single();
+      if (error) throw error;
+      id = data.id;
+      editingId = id;
+    }
+    const cur = products.find((x) => x.id === id) || {};
+    const patch = {};
+    if (full) { btn.textContent = '풀버전 업로드 중…'; patch.file_path = await uploadPdf('products', id, 'full', full, cur.file_path); }
+    if (sample) { btn.textContent = '샘플 업로드 중…'; patch.sample_path = await uploadPdf('samples', id, 'sample', sample, cur.sample_path); }
+    else if ($('#pSampleDel').checked && cur.sample_path) {
+      await sb.storage.from('samples').remove([cur.sample_path]);
+      patch.sample_path = null;
+    }
+    if (Object.keys(patch).length) {
+      const { error } = await sb.from('products').update(patch).eq('id', id);
+      if (error) throw error;
+    }
+    closePkg();
+    alert('저장했습니다.');
+  } catch (e2) {
+    err(e2.message || String(e2));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '저장';
+    loadProducts();
+  }
+}
+
+async function togglePkg(id) {
+  const p = products.find((x) => x.id === id);
+  if (!p.is_active && !p.file_path && !confirm('풀버전 PDF가 없어 판매 재개해도 사이트에 표시되지 않습니다. 계속할까요?')) return;
+  const { error } = await sb.from('products').update({ is_active: !p.is_active }).eq('id', id);
+  if (error) return alert(error.message);
+  loadProducts();
+}
+
+async function deletePkg(id) {
+  const p = products.find((x) => x.id === id);
+  if (!confirm(`'${productLabel(p)}' 패키지를 삭제하시겠습니까? 업로드한 PDF도 함께 삭제됩니다.`)) return;
+  const { error } = await sb.from('products').delete().eq('id', id);
+  if (error) {
+    return alert(error.code === '23503' ? '이 패키지로 들어온 주문이 있어 삭제할 수 없습니다. 대신 판매 중지로 바꿔 주세요.' : error.message);
+  }
+  if (p.file_path) await sb.storage.from('products').remove([p.file_path]);
+  if (p.sample_path) await sb.storage.from('samples').remove([p.sample_path]);
+  loadProducts();
+}
+
+let view = 'orders';
+function setView(v) {
+  view = v;
+  document.querySelectorAll('[data-view]').forEach((b) => {
+    b.className = `h-9 rounded-lg text-sm font-bold ${b.dataset.view === v ? 'bg-white text-[#1e1b4b] shadow-sm' : 'text-slate-500'}`;
+  });
+  $('#dash').classList.toggle('hidden', v !== 'orders');
+  $('#pkgView').classList.toggle('hidden', v !== 'products');
+  if (v === 'orders') load(); else loadProducts();
+}
+
 async function showSession() {
   const { data: { session } } = await sb.auth.getSession();
   $('#loginForm').classList.toggle('hidden', !!session);
-  $('#dash').classList.toggle('hidden', !session);
+  $('#views').classList.toggle('hidden', !session);
   $('#logout').classList.toggle('hidden', !session);
-  if (session) load();
+  if (session) setView(view);
+  else { $('#dash').classList.add('hidden'); $('#pkgView').classList.add('hidden'); }
 }
 
 $('#loginForm').onsubmit = async (e) => {
@@ -188,6 +448,8 @@ $('#loginForm').onsubmit = async (e) => {
 };
 $('#logout').onclick = async () => { await sb.auth.signOut(); showSession(); };
 $('#reload').onclick = load;
+$('#newPkg').onclick = () => openPkg(null);
+$('#pkgForm').onsubmit = savePkg;
 document.addEventListener('click', async (e) => {
   const f = e.target.closest('[data-f]');
   if (f) { filter = f.dataset.f; load(); }
@@ -199,6 +461,15 @@ document.addEventListener('click', async (e) => {
   if (c && (await copyText(dmMessage(orders[c.dataset.copy])))) c.textContent = '복사됨 ✓';
   const sent = e.target.closest('[data-sent]');
   if (sent) markSent(sent.dataset.sent);
+  const v = e.target.closest('[data-view]');
+  if (v) setView(v.dataset.view);
+  const pe = e.target.closest('[data-pkg-edit]');
+  if (pe) openPkg(pe.dataset.pkgEdit);
+  const pt = e.target.closest('[data-pkg-toggle]');
+  if (pt) togglePkg(pt.dataset.pkgToggle);
+  const pd = e.target.closest('[data-pkg-del]');
+  if (pd) deletePkg(pd.dataset.pkgDel);
+  if (e.target.closest('[data-pkg-close]') || e.target === $('#pkgModal')) closePkg();
 });
 
 showSession();

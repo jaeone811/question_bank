@@ -73,7 +73,7 @@
       </div>
       <dl class="mt-10 grid grid-cols-3 gap-3 max-w-md text-center">
         <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">변형 문항</dt><dd class="text-xl font-extrabold">1,200+</dd></div>
-        <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">과목</dt><dd class="text-xl font-extrabold" id="statSubjects">-</dd></div>
+        <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">패키지</dt><dd class="text-xl font-extrabold" id="statSubjects">-</dd></div>
         <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">받는 방법</dt><dd class="text-xl font-extrabold">메일·DM</dd></div>
       </dl>
     </div>
@@ -324,13 +324,14 @@ const CONFIG = {
   supabase: { url: '', anonKey: '' },
 };
 
-const PRODUCTS = [
-  { id: 'h1-eng',  grade: '고1', subject: '영어', book: '능률(민병천) 1~4과',     price: 9900,  items: 180, sample: 'samples/h1-eng.pdf' },
-  { id: 'h1-kor',  grade: '고1', subject: '국어', book: '비상(박영민) 문학·비문학', price: 8900,  items: 150, sample: 'samples/h1-kor.pdf' },
-  { id: 'h1-math', grade: '고1', subject: '수학', book: '공통수학1 다항식~방정식',  price: 9900,  items: 200, sample: 'samples/h1-math.pdf' },
-  { id: 'h2-kor',  grade: '고2', subject: '국어', book: '문학 (천재 김동환)',       price: 10900, items: 160, sample: 'samples/h2-kor.pdf' },
-  { id: 'h2-eng',  grade: '고2', subject: '영어', book: '영어Ⅰ 모의고사 변형',     price: 10900, items: 220, sample: 'samples/h2-eng.pdf' },
-  { id: 'h3-eng',  grade: '고3', subject: '영어', book: '수능특강 영어 변형',       price: 12900, items: 300, sample: 'samples/h3-eng.pdf' },
+// Supabase 미연동 시 보여줄 기본 패키지 (연동하면 관리자 페이지에서 등록한 패키지를 불러옴)
+let PRODUCTS = [
+  { id: 'h1-eng',  grade: '고1', subject: '영어', title: '능률(민병천) 1~4과',      description: '본문 변형, 어법·어휘, 빈칸, 순서·삽입 유형을 과별로 정리했습니다.', price: 9900,  items: 180, sample: 'samples/h1-eng.pdf' },
+  { id: 'h1-kor',  grade: '고1', subject: '국어', title: '비상(박영민) 문학·비문학', description: '교과서 수록 작품과 지문을 바탕으로 한 서술형 포함 변형 문제입니다.', price: 8900,  items: 150, sample: 'samples/h1-kor.pdf' },
+  { id: 'h1-math', grade: '고1', subject: '수학', title: '공통수학1 다항식~방정식',  description: '단원별 기본·심화 문항과 학교 기출 유형 변형을 담았습니다.',       price: 9900,  items: 200, sample: 'samples/h1-math.pdf' },
+  { id: 'h2-kor',  grade: '고2', subject: '국어', title: '문학 (천재 김동환)',       description: '현대시·고전시가·소설 작품별 핵심 개념과 변형 문제입니다.',       price: 10900, items: 160, sample: 'samples/h2-kor.pdf' },
+  { id: 'h2-eng',  grade: '고2', subject: '영어', title: '영어Ⅰ 모의고사 변형',     description: '최근 모의고사 지문을 내신형으로 변형한 문제입니다.',             price: 10900, items: 220, sample: 'samples/h2-eng.pdf' },
+  { id: 'h3-eng',  grade: '고3', subject: '영어', title: '수능특강 영어 변형',       description: '수능특강 지문별 주제·요지, 어법, 빈칸, 서술형 변형 문제입니다.', price: 12900, items: 300, sample: 'samples/h3-eng.pdf' },
 ];
 
 const METHOD_GUIDE = {
@@ -353,7 +354,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const won = (n) => Number(n).toLocaleString('ko-KR');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const productById = (id) => PRODUCTS.find((p) => p.id === id);
-const productLabel = (p) => `${p.grade} ${p.subject} · ${p.book}`;
+const productLabel = (p) => [[p.grade, p.subject].filter(Boolean).join(' '), p.title].filter(Boolean).join(' · ');
 const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 // ig.me 는 앱에서만 DM 창을 열어줌 → PC 에서는 프로필로 이동
 const instaDmUrl = (id) => (isMobile() ? `https://ig.me/m/${id}` : `https://www.instagram.com/${id}/`);
@@ -414,6 +415,25 @@ const sb = CONFIG.supabase.url && CONFIG.supabase.anonKey && window.supabase
   : null;
 
 const api = {
+  // 판매 중 + 풀버전 업로드 완료된 패키지만 조회됨 (RLS)
+  async listProducts() {
+    const { data, error } = await sb
+      .from('products')
+      .select('id, grade, subject, title, description, item_count, price, sample_path')
+      .order('sort_order')
+      .order('created_at');
+    if (error) throw error;
+    return data.map((r) => ({
+      id: r.id,
+      grade: r.grade,
+      subject: r.subject,
+      title: r.title,
+      description: r.description,
+      price: r.price,
+      items: r.item_count,
+      sample: r.sample_path ? sb.storage.from('samples').getPublicUrl(r.sample_path).data.publicUrl : null,
+    }));
+  },
   // 주문 생성: 금액은 서버가 products 테이블 기준으로 다시 계산함 (클라 금액 조작 방지)
   async createOrder(o) {
     const { data, error } = await sb.rpc('create_order', {
@@ -441,7 +461,7 @@ const api = {
 let currentGrade = '전체';
 
 function renderTabs() {
-  const grades = ['전체', ...new Set(PRODUCTS.map((p) => p.grade))];
+  const grades = ['전체', ...new Set(PRODUCTS.map((p) => p.grade).filter(Boolean))];
   $('#gradeTabs').innerHTML = grades.map((g) => `
     <button class="shrink-0 h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold ${g === currentGrade ? 'tab-active' : 'bg-white text-slate-600'}" data-grade="${g}">${g}</button>
   `).join('');
@@ -449,17 +469,22 @@ function renderTabs() {
 
 function renderProducts() {
   const list = PRODUCTS.filter((p) => currentGrade === '전체' || p.grade === currentGrade);
+  if (!list.length) {
+    $('#productGrid').innerHTML = `<p class="col-span-full py-12 text-center text-sm text-slate-400">판매 중인 패키지가 없습니다.</p>`;
+    return;
+  }
   $('#productGrid').innerHTML = list.map((p) => `
     <article class="group rounded-2xl border border-slate-100 hover:border-point-violet/50 hover:shadow-glow transition p-4 flex flex-col">
-      <div class="flex items-center gap-2">
-        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-navy text-white">${esc(p.grade)}</span>
-        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-point-violet/10 text-point-violet">${esc(p.subject)}</span>
-        <span class="ml-auto text-[11px] text-slate-400">${p.items}문항</span>
+      <div class="flex items-center gap-2 min-h-[20px]">
+        ${p.grade ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-navy text-white">${esc(p.grade)}</span>` : ''}
+        ${p.subject ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-point-violet/10 text-point-violet">${esc(p.subject)}</span>` : ''}
+        ${p.items ? `<span class="ml-auto text-[11px] text-slate-400">${won(p.items)}문항</span>` : ''}
       </div>
-      <h3 class="mt-3 font-bold text-navy leading-snug">${esc(p.book)}</h3>
-      <p class="mt-1 text-xl font-extrabold">${won(p.price)}<span class="text-sm font-semibold text-slate-400">원</span></p>
-      <div class="mt-4 grid grid-cols-2 gap-2">
-        <button class="h-10 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50" data-preview="${p.id}">샘플 보기</button>
+      <h3 class="mt-3 font-bold text-navy leading-snug">${esc(p.title)}</h3>
+      ${p.description ? `<p class="mt-1 text-sm text-slate-500 leading-relaxed whitespace-pre-line">${esc(p.description)}</p>` : ''}
+      <p class="mt-auto pt-3 text-xl font-extrabold">${won(p.price)}<span class="text-sm font-semibold text-slate-400">원</span></p>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button class="h-10 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40" data-preview="${p.id}" ${p.sample ? '' : 'disabled title="샘플 준비 중"'}>${p.sample ? '샘플 보기' : '샘플 준비 중'}</button>
         <button class="h-10 rounded-xl bg-navy text-white text-sm font-bold hover:bg-navy-700" data-buy="${p.id}">구매하기</button>
       </div>
     </article>
@@ -490,7 +515,7 @@ async function openPreview(id) {
   $('#pdfTitle').textContent = productLabel(p);
   const frame = $('#pdfFrame');
   const dl = $('#pdfDownload');
-  dl.href = p.sample;
+  dl.href = p.sample || '#';
   dl.setAttribute('download', `${p.grade}_${p.subject}_샘플.pdf`);
   frame.classList.add('hidden');
   $('#pdfFallback').classList.add('hidden');
@@ -505,8 +530,9 @@ async function openPreview(id) {
     $('#pdfFallback').classList.add('flex');
   };
 
-  // 파일 존재 확인 (file:// 로 열면 fetch 가 막히므로 그 경우엔 그냥 iframe 시도)
-  if (location.protocol.startsWith('http')) {
+  if (!p.sample) return fail('이 패키지는 샘플을 준비 중입니다.');
+  // 같은 사이트에 둔 샘플 파일은 존재 확인 (file:// 로 열면 fetch 가 막히므로 그 경우엔 그냥 iframe 시도)
+  if (location.protocol.startsWith('http') && !/^https?:/.test(p.sample)) {
     try {
       const res = await fetch(p.sample, { method: 'HEAD' });
       if (!res.ok) return fail('샘플 파일이 아직 준비되지 않았습니다. 잠시 후 다시 시도하시거나 문의해 주세요.');
@@ -567,6 +593,7 @@ function setMethod(method) {
 }
 
 function validate() {
+  if (!productById($('#fSubject').value)) return '구매할 패키지를 선택해 주세요.';
   const name = $('#fName').value.trim();
   if (!name) return '입금자명을 입력해 주세요.';
   if ($('input[name="delivery"]:checked').value === 'INSTAGRAM') {
@@ -689,16 +716,33 @@ async function openOrders() {
 /* =========================================================
  * Init / Events
  * ========================================================= */
-function init() {
+function renderCatalog() {
   $('#statSubjects').textContent = PRODUCTS.length;
+  if (!PRODUCTS.some((p) => p.grade === currentGrade)) currentGrade = '전체';
+  renderTabs();
+  renderProducts();
+}
+
+async function loadProducts() {
+  if (!sb) return renderCatalog();
+  $('#productGrid').innerHTML = `<p class="col-span-full py-12 text-center text-sm text-slate-400">패키지를 불러오는 중입니다...</p>`;
+  try {
+    PRODUCTS = await api.listProducts();
+    renderCatalog();
+  } catch (e) {
+    console.error(e);
+    $('#productGrid').innerHTML = `<p class="col-span-full py-12 text-center text-sm text-rose-600">패키지 목록을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</p>`;
+  }
+}
+
+function init() {
   $('#kakaoLink').href = CONFIG.kakaoPayLink;
   $('#tossLink').href = CONFIG.tossLink;
   $('#bankName').textContent = CONFIG.bank.name;
   $('#bankNumber').textContent = CONFIG.bank.number;
   $('#bankHolder').textContent = CONFIG.bank.holder;
   $('#shopInsta1').textContent = '@' + CONFIG.instagramId;
-  renderTabs();
-  renderProducts();
+  loadProducts();
   updateBadge();
 
   document.addEventListener('click', (e) => {
@@ -716,7 +760,11 @@ function init() {
     if (e.key === 'Escape') $$('[data-modal].open').forEach(closeModal);
   });
 
-  $('#heroSample').onclick = () => openPreview(PRODUCTS[0].id);
+  $('#heroSample').onclick = () => {
+    const p = PRODUCTS.find((x) => x.sample);
+    if (p) openPreview(p.id);
+    else toast('준비된 샘플이 아직 없습니다.');
+  };
   $('#heroBuy').onclick = () => openCheckout();
   $('#pdfBuy').onclick = () => { closeModal($('#pdfModal')); openCheckout(previewProductId); };
   $('#btnMyOrders').onclick = openOrders;
