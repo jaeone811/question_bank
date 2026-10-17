@@ -31,11 +31,8 @@
     .modal.open { display: flex; }
     .modal.open .modal-panel { animation: up .22s ease-out; }
     @keyframes up { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
-    .tab-active { background: #1e1b4b; color: #fff; border-color: #1e1b4b; }
     .pay-active, .dlv-active { border-color: #8b5cf6; background: #f5f3ff; box-shadow: 0 0 0 3px rgba(139,92,246,.18); }
     .toast { transition: opacity .2s, transform .2s; }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { scrollbar-width: none; }
   </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -58,7 +55,7 @@
     <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-point-violet/40 blur-3xl"></div>
     <div class="absolute -bottom-32 -left-20 w-72 h-72 rounded-full bg-point-yellow/20 blur-3xl"></div>
     <div class="relative max-w-5xl mx-auto px-4 pt-12 pb-16 md:pt-20 md:pb-24">
-      <span class="inline-block text-xs font-bold px-3 py-1 rounded-full bg-point-yellow text-navy">기말고사 대비 자료 오픈</span>
+      <span class="inline-block text-xs font-bold px-3 py-1 rounded-full bg-point-yellow text-navy">고2 기말고사 대비 자료 오픈</span>
       <h1 class="mt-4 text-[2rem] leading-tight md:text-5xl font-extrabold tracking-tight">
         시험에 나올 문제,<br />
         <span class="text-point-yellow">미리</span> 풀어보세요.
@@ -71,10 +68,10 @@
         <button id="heroSample" class="h-12 px-6 rounded-xl bg-white text-navy font-bold hover:bg-white/90">📄 무료 샘플 PDF 보기</button>
         <button id="heroBuy" class="h-12 px-6 rounded-xl bg-point-yellow text-navy font-extrabold shadow-glow hover:brightness-95">🎯 풀버전 족집게 결제하기</button>
       </div>
-      <dl class="mt-10 grid grid-cols-3 gap-3 max-w-md text-center">
-        <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">변형 문항</dt><dd class="text-xl font-extrabold">1,200+</dd></div>
-        <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">패키지</dt><dd class="text-xl font-extrabold" id="statSubjects">-</dd></div>
-        <div class="rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">받는 방법</dt><dd class="text-xl font-extrabold">메일·DM</dd></div>
+      <dl class="mt-10 flex gap-3 max-w-md text-center">
+        <div class="flex-1 rounded-xl bg-white/5 py-3" id="statItemsBox"><dt class="text-xs text-white/60">변형 문항</dt><dd class="text-xl font-extrabold" id="statItems">-</dd></div>
+        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">패키지</dt><dd class="text-xl font-extrabold" id="statSubjects">-</dd></div>
+        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">받는 방법</dt><dd class="text-xl font-extrabold">메일·DM</dd></div>
       </dl>
     </div>
   </section>
@@ -88,9 +85,6 @@
           <p class="text-sm text-slate-500 mt-1">과목별 무료 샘플을 확인하신 뒤 구매해 주세요.</p>
         </div>
       </div>
-
-      <!-- 학년 필터 탭 -->
-      <div id="gradeTabs" class="mt-4 flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1"></div>
 
       <!-- 상품 카드 -->
       <div id="productGrid" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
@@ -326,12 +320,9 @@ const CONFIG = {
 
 // Supabase 미연동 시 보여줄 기본 패키지 (연동하면 관리자 페이지에서 등록한 패키지를 불러옴)
 let PRODUCTS = [
-  { id: 'h1-eng',  grade: '고1', subject: '영어', title: '능률(민병천) 1~4과',      description: '본문 변형, 어법·어휘, 빈칸, 순서·삽입 유형을 과별로 정리했습니다.', price: 9900,  items: 180, sample: 'samples/h1-eng.pdf' },
-  { id: 'h1-kor',  grade: '고1', subject: '국어', title: '비상(박영민) 문학·비문학', description: '교과서 수록 작품과 지문을 바탕으로 한 서술형 포함 변형 문제입니다.', price: 8900,  items: 150, sample: 'samples/h1-kor.pdf' },
-  { id: 'h1-math', grade: '고1', subject: '수학', title: '공통수학1 다항식~방정식',  description: '단원별 기본·심화 문항과 학교 기출 유형 변형을 담았습니다.',       price: 9900,  items: 200, sample: 'samples/h1-math.pdf' },
-  { id: 'h2-kor',  grade: '고2', subject: '국어', title: '문학 (천재 김동환)',       description: '현대시·고전시가·소설 작품별 핵심 개념과 변형 문제입니다.',       price: 10900, items: 160, sample: 'samples/h2-kor.pdf' },
-  { id: 'h2-eng',  grade: '고2', subject: '영어', title: '영어Ⅰ 모의고사 변형',     description: '최근 모의고사 지문을 내신형으로 변형한 문제입니다.',             price: 10900, items: 220, sample: 'samples/h2-eng.pdf' },
-  { id: 'h3-eng',  grade: '고3', subject: '영어', title: '수능특강 영어 변형',       description: '수능특강 지문별 주제·요지, 어법, 빈칸, 서술형 변형 문제입니다.', price: 12900, items: 300, sample: 'samples/h3-eng.pdf' },
+  { id: 'h2-eng',  subject: '영어', title: '영어Ⅰ 모의고사 변형',  description: '최근 모의고사 지문을 내신형으로 변형한 문제입니다.',       price: 10900, items: null, sample: 'samples/h2-eng.pdf' },
+  { id: 'h2-kor',  subject: '국어', title: '문학 (천재 김동환)',    description: '현대시·고전시가·소설 작품별 핵심 개념과 변형 문제입니다.', price: 10900, items: null, sample: 'samples/h2-kor.pdf' },
+  { id: 'h2-math', subject: '수학', title: '수학Ⅰ 지수·로그함수',  description: '단원별 기본·심화 문항과 학교 기출 유형 변형을 담았습니다.', price: 9900,  items: null, sample: 'samples/h2-math.pdf' },
 ];
 
 const METHOD_GUIDE = {
@@ -354,7 +345,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const won = (n) => Number(n).toLocaleString('ko-KR');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const productById = (id) => PRODUCTS.find((p) => p.id === id);
-const productLabel = (p) => [[p.grade, p.subject].filter(Boolean).join(' '), p.title].filter(Boolean).join(' · ');
+const productLabel = (p) => [p.subject, p.title].filter(Boolean).join(' · ');
 const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 // ig.me 는 앱에서만 DM 창을 열어줌 → PC 에서는 프로필로 이동
 const instaDmUrl = (id) => (isMobile() ? `https://ig.me/m/${id}` : `https://www.instagram.com/${id}/`);
@@ -419,13 +410,12 @@ const api = {
   async listProducts() {
     const { data, error } = await sb
       .from('products')
-      .select('id, grade, subject, title, description, item_count, price, sample_path')
+      .select('id, subject, title, description, item_count, price, sample_path')
       .order('sort_order')
       .order('created_at');
     if (error) throw error;
     return data.map((r) => ({
       id: r.id,
-      grade: r.grade,
       subject: r.subject,
       title: r.title,
       description: r.description,
@@ -456,19 +446,10 @@ const api = {
 };
 
 /* =========================================================
- * Products / Tabs
+ * Products
  * ========================================================= */
-let currentGrade = '전체';
-
-function renderTabs() {
-  const grades = ['전체', ...new Set(PRODUCTS.map((p) => p.grade).filter(Boolean))];
-  $('#gradeTabs').innerHTML = grades.map((g) => `
-    <button class="shrink-0 h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold ${g === currentGrade ? 'tab-active' : 'bg-white text-slate-600'}" data-grade="${g}">${g}</button>
-  `).join('');
-}
-
 function renderProducts() {
-  const list = PRODUCTS.filter((p) => currentGrade === '전체' || p.grade === currentGrade);
+  const list = PRODUCTS;
   if (!list.length) {
     $('#productGrid').innerHTML = `<p class="col-span-full py-12 text-center text-sm text-slate-400">판매 중인 패키지가 없습니다.</p>`;
     return;
@@ -476,7 +457,6 @@ function renderProducts() {
   $('#productGrid').innerHTML = list.map((p) => `
     <article class="group rounded-2xl border border-slate-100 hover:border-point-violet/50 hover:shadow-glow transition p-4 flex flex-col">
       <div class="flex items-center gap-2 min-h-[20px]">
-        ${p.grade ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-navy text-white">${esc(p.grade)}</span>` : ''}
         ${p.subject ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-point-violet/10 text-point-violet">${esc(p.subject)}</span>` : ''}
         ${p.items ? `<span class="ml-auto text-[11px] text-slate-400">${won(p.items)}문항</span>` : ''}
       </div>
@@ -516,7 +496,7 @@ async function openPreview(id) {
   const frame = $('#pdfFrame');
   const dl = $('#pdfDownload');
   dl.href = p.sample || '#';
-  dl.setAttribute('download', `${p.grade}_${p.subject}_샘플.pdf`);
+  dl.setAttribute('download', `${productLabel(p).replace(/[\\/:*?"<>|]/g, '')}_샘플.pdf`);
   frame.classList.add('hidden');
   $('#pdfFallback').classList.add('hidden');
   $('#pdfFallback').classList.remove('flex');
@@ -717,9 +697,11 @@ async function openOrders() {
  * Init / Events
  * ========================================================= */
 function renderCatalog() {
+  // 관리자 페이지에서 입력한 패키지별 문항 수 합계 (입력된 게 없으면 칸 숨김)
+  const totalItems = PRODUCTS.reduce((sum, p) => sum + (p.items || 0), 0);
   $('#statSubjects').textContent = PRODUCTS.length;
-  if (!PRODUCTS.some((p) => p.grade === currentGrade)) currentGrade = '전체';
-  renderTabs();
+  $('#statItems').textContent = won(totalItems);
+  $('#statItemsBox').classList.toggle('hidden', totalItems === 0);
   renderProducts();
 }
 
@@ -747,8 +729,6 @@ function init() {
 
   document.addEventListener('click', (e) => {
     const t = e.target;
-    const grade = t.closest('[data-grade]');
-    if (grade) { currentGrade = grade.dataset.grade; renderTabs(); renderProducts(); return; }
     const pv = t.closest('[data-preview]');
     if (pv) return openPreview(pv.dataset.preview);
     const buy = t.closest('[data-buy]');

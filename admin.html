@@ -69,10 +69,6 @@
       </label>
       <div class="grid grid-cols-2 gap-3">
         <label class="block">
-          <span class="text-xs font-semibold text-slate-500">학년</span>
-          <input id="pGrade" list="gradeList" maxlength="10" placeholder="예: 고1" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
-        </label>
-        <label class="block">
           <span class="text-xs font-semibold text-slate-500">과목</span>
           <input id="pSubject" list="subjectList" maxlength="20" placeholder="예: 영어" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
         </label>
@@ -81,25 +77,23 @@
           <input id="pPrice" type="number" min="100" step="100" inputmode="numeric" placeholder="9900" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
         </label>
         <label class="block">
-          <span class="text-xs font-semibold text-slate-500">문항 수</span>
-          <input id="pItems" type="number" min="0" inputmode="numeric" placeholder="180" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+          <span class="text-xs font-semibold text-slate-500">문항 수 (PDF 실제 문항)</span>
+          <input id="pItems" type="number" min="0" inputmode="numeric" placeholder="예: 120" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
+        </label>
+        <label class="block">
+          <span class="text-xs font-semibold text-slate-500">표시 순서 (작을수록 앞)</span>
+          <input id="pSort" type="number" inputmode="numeric" value="0" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
         </label>
       </div>
-      <datalist id="gradeList"><option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3"></datalist>
+      <p class="-mt-2 text-[11px] text-slate-400">문항 수는 사이트 카드와 상단 '변형 문항' 합계에 그대로 표시됩니다.</p>
       <datalist id="subjectList"><option value="국어"><option value="영어"><option value="수학"><option value="사회"><option value="과학"><option value="한국사"></datalist>
       <label class="block">
         <span class="text-xs font-semibold text-slate-500">설명</span>
         <textarea id="pDesc" rows="3" maxlength="300" placeholder="사이트 카드에 표시되는 설명입니다." class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"></textarea>
       </label>
-      <div class="grid grid-cols-2 gap-3 items-end">
-        <label class="block">
-          <span class="text-xs font-semibold text-slate-500">표시 순서 (작을수록 앞)</span>
-          <input id="pSort" type="number" inputmode="numeric" value="0" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3" />
-        </label>
-        <label class="flex items-center gap-2 h-11 text-sm font-semibold">
-          <input id="pActive" type="checkbox" class="w-5 h-5 accent-[#1e1b4b]" checked /> 판매 중
-        </label>
-      </div>
+      <label class="flex items-center gap-2 text-sm font-semibold">
+        <input id="pActive" type="checkbox" class="w-5 h-5 accent-[#1e1b4b]" checked /> 판매 중
+      </label>
 
       <div class="rounded-xl border border-slate-200 p-3 space-y-2">
         <p class="text-sm font-bold text-[#1e1b4b]">풀버전 PDF <span class="text-xs font-normal text-slate-400">(비공개 · 구매자에게만 전달)</span></p>
@@ -141,11 +135,11 @@ const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const instaDmUrl = (id) => (isMobile ? `https://ig.me/m/${id}` : `https://www.instagram.com/${id}/`);
 const fmt = (t) => new Date(t).toLocaleString('ko-KR');
 const won = (n) => Number(n).toLocaleString('ko-KR');
-const productLabel = (p) => [[p.grade, p.subject].filter(Boolean).join(' '), p.title].filter(Boolean).join(' · ');
+const productLabel = (p) => [p.subject, p.title].filter(Boolean).join(' · ');
 let orders = {};
 
 async function load() {
-  let q = sb.from('orders').select('*, products(title, grade, subject)').order('created_at', { ascending: false }).limit(200);
+  let q = sb.from('orders').select('*, products(title, subject)').order('created_at', { ascending: false }).limit(200);
   if (filter !== 'ALL') q = q.eq('status', filter);
   const { data, error } = await q;
   document.querySelectorAll('[data-f]').forEach((b) => {
@@ -294,10 +288,9 @@ const fileName = (path) => (path ? path.split('/').pop() : '');
 
 function openPkg(id) {
   editingId = id || null;
-  const p = products.find((x) => x.id === id) || { title: '', grade: '', subject: '', price: '', item_count: '', description: '', sort_order: (products.at(-1)?.sort_order ?? 0) + 10, is_active: true };
+  const p = products.find((x) => x.id === id) || { title: '', subject: '', price: '', item_count: '', description: '', sort_order: (products.at(-1)?.sort_order ?? 0) + 10, is_active: true };
   $('#pkgFormTitle').textContent = id ? '패키지 수정' : '새 패키지';
   $('#pTitle').value = p.title;
-  $('#pGrade').value = p.grade ?? '';
   $('#pSubject').value = p.subject ?? '';
   $('#pPrice').value = p.price;
   $('#pItems').value = p.item_count ?? '';
@@ -359,7 +352,6 @@ async function savePkg(e) {
   try {
     const row = {
       title,
-      grade: $('#pGrade').value.trim() || null,
       subject: $('#pSubject').value.trim() || null,
       description: $('#pDesc').value.trim() || null,
       item_count: items,

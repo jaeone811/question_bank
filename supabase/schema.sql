@@ -8,7 +8,6 @@
 create table if not exists public.products (
   id          text primary key default ('p-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 10)),
   title       text not null check (char_length(title) between 1 and 60),  -- 패키지 이름 (예: '능률(민병천) 1~4과')
-  grade       text,                            -- 학년 (예: '고1')
   subject     text,                            -- 과목 (예: '영어')
   description text,                            -- 패키지 설명
   item_count  integer check (item_count is null or item_count >= 0),  -- 문항 수
@@ -23,7 +22,7 @@ create table if not exists public.products (
 -- 이전 버전에서 업그레이드하는 경우
 alter table public.products alter column file_path drop not null;
 alter table public.products alter column id set default ('p-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
-alter table public.products add column if not exists grade text;
+alter table public.products drop column if exists grade;  -- 고2 전용이라 학년 구분 안 씀
 alter table public.products add column if not exists subject text;
 alter table public.products add column if not exists description text;
 alter table public.products add column if not exists item_count integer check (item_count is null or item_count >= 0);
@@ -216,13 +215,18 @@ create policy "admin manage pdfs" on storage.objects for all to authenticated
   using (bucket_id in ('products', 'samples') and public.is_admin())
   with check (bucket_id in ('products', 'samples') and public.is_admin());
 
+-- 이전 버전이 넣었던 고1·고3 예시 패키지와 가짜 문항 수 정리 (주문이 없는 경우만)
+delete from public.products p
+ where p.id in ('h1-eng', 'h1-kor', 'h1-math', 'h3-eng')
+   and not exists (select 1 from public.orders o where o.product_id = p.id);
+update public.products set item_count = null
+ where (id = 'h2-kor' and item_count = 160) or (id = 'h2-eng' and item_count = 220);
+
 -- ---------- 11. 예시 패키지 (관리자 페이지에서 PDF 를 올리기 전까지는 사이트에 안 보임) ----------
+-- 문항 수는 비워둠 → 관리자 페이지에서 PDF 의 실제 문항 수를 입력
 -- 이미 있는 패키지는 건드리지 않음 (관리자 페이지에서 수정한 내용 보존)
-insert into public.products (id, grade, subject, title, description, item_count, price, sort_order) values
-  ('h1-eng',  '고1', '영어', '능률(민병천) 1~4과',      '본문 변형, 어법·어휘, 빈칸, 순서·삽입 유형을 과별로 정리했습니다.', 180, 9900,  10),
-  ('h1-kor',  '고1', '국어', '비상(박영민) 문학·비문학', '교과서 수록 작품과 지문을 바탕으로 한 서술형 포함 변형 문제입니다.', 150, 8900,  20),
-  ('h1-math', '고1', '수학', '공통수학1 다항식~방정식',  '단원별 기본·심화 문항과 학교 기출 유형 변형을 담았습니다.',       200, 9900,  30),
-  ('h2-kor',  '고2', '국어', '문학 (천재 김동환)',       '현대시·고전시가·소설 작품별 핵심 개념과 변형 문제입니다.',       160, 10900, 40),
-  ('h2-eng',  '고2', '영어', '영어Ⅰ 모의고사 변형',     '최근 모의고사 지문을 내신형으로 변형한 문제입니다.',             220, 10900, 50),
-  ('h3-eng',  '고3', '영어', '수능특강 영어 변형',       '수능특강 지문별 주제·요지, 어법, 빈칸, 서술형 변형 문제입니다.', 300, 12900, 60)
+insert into public.products (id, subject, title, description, price, sort_order) values
+  ('h2-eng',  '영어', '영어Ⅰ 모의고사 변형', '최근 모의고사 지문을 내신형으로 변형한 문제입니다.',       10900, 10),
+  ('h2-kor',  '국어', '문학 (천재 김동환)',   '현대시·고전시가·소설 작품별 핵심 개념과 변형 문제입니다.', 10900, 20),
+  ('h2-math', '수학', '수학Ⅰ 지수·로그함수', '단원별 기본·심화 문항과 학교 기출 유형 변형을 담았습니다.', 9900,  30)
 on conflict (id) do nothing;

@@ -78,10 +78,10 @@ async function appendSheet(o: Order) {
   if (!res.ok) console.error("Google Sheet 실패", res.status);
 }
 
-type Product = { title: string; grade: string | null; subject: string | null; file_path: string | null };
+type Product = { title: string; subject: string | null; file_path: string | null };
 
-// '고1 영어 · 패키지명' (학년/과목이 없으면 패키지명만)
-const productLabel = (p: Product) => [[p.grade, p.subject].filter(Boolean).join(" "), p.title].filter(Boolean).join(" · ");
+// '영어 · 패키지명' (과목이 없으면 패키지명만)
+const productLabel = (p: Product) => [p.subject, p.title].filter(Boolean).join(" · ");
 const safeFileName = (p: Product) => `${productLabel(p).replace(/[\\/:*?"<>|]/g, "")}.pdf`;
 
 type DeliverResult = { ok: boolean; error?: string; url?: string; expiresAt?: string };
@@ -90,7 +90,7 @@ type DeliverResult = { ok: boolean; error?: string; url?: string; expiresAt?: st
 async function deliverPdf(orderNo: string): Promise<DeliverResult> {
   const { data: o, error } = await db
     .from("orders")
-    .select("order_no, buyer_name, email, instagram_id, delivery_method, status, products(title, grade, subject, file_path)")
+    .select("order_no, buyer_name, email, instagram_id, delivery_method, status, products(title, subject, file_path)")
     .eq("order_no", orderNo)
     .single();
   if (error || !o) return { ok: false, error: "주문을 찾을 수 없음" };
@@ -176,7 +176,7 @@ async function handleWebhook(payload: WebhookPayload) {
   if (payload.table !== "orders" || !o) return;
 
   if (payload.type === "INSERT") {
-    const { data: p } = await db.from("products").select("title, grade, subject, file_path").eq("id", o.product_id).maybeSingle();
+    const { data: p } = await db.from("products").select("title, subject, file_path").eq("id", o.product_id).maybeSingle();
     const productName = p ? productLabel(p as Product) : o.product_id;
     await Promise.all([
       sendMail(
