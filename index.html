@@ -69,8 +69,8 @@
         <button id="heroBuy" class="h-12 px-6 rounded-xl bg-point-yellow text-navy font-extrabold shadow-glow hover:brightness-95">🎯 풀버전 족집게 결제하기</button>
       </div>
       <dl class="mt-10 flex gap-3 max-w-md text-center">
-        <div class="flex-1 rounded-xl bg-white/5 py-3" id="statItemsBox"><dt class="text-xs text-white/60">변형 문항</dt><dd class="text-xl font-extrabold" id="statItems">-</dd></div>
-        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">패키지</dt><dd class="text-xl font-extrabold" id="statSubjects">-</dd></div>
+        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">PDF 자료</dt><dd class="text-xl font-extrabold" id="statPdfs">-</dd></div>
+        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">무료 샘플</dt><dd class="text-xl font-extrabold" id="statSamples">-</dd></div>
         <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">받는 방법</dt><dd class="text-xl font-extrabold">메일·DM</dd></div>
       </dl>
     </div>
@@ -697,11 +697,9 @@ async function openOrders() {
  * Init / Events
  * ========================================================= */
 function renderCatalog() {
-  // 관리자 페이지에서 입력한 패키지별 문항 수 합계 (입력된 게 없으면 칸 숨김)
-  const totalItems = PRODUCTS.reduce((sum, p) => sum + (p.items || 0), 0);
-  $('#statSubjects').textContent = PRODUCTS.length;
-  $('#statItems').textContent = won(totalItems);
-  $('#statItemsBox').classList.toggle('hidden', totalItems === 0);
+  // 사이트에는 풀버전 PDF 가 올라간 패키지만 오므로 = 판매 중인 PDF 개수
+  $('#statPdfs').textContent = `${PRODUCTS.length}개`;
+  $('#statSamples').textContent = `${PRODUCTS.filter((p) => p.sample).length}개`;
   renderProducts();
 }
 
