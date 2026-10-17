@@ -24,12 +24,17 @@ create table if not exists public.orders (
   amount           integer not null check (amount > 0),
   status           text not null default 'PENDING' check (status in ('PENDING', 'APPROVED', 'REJECTED')),
   admin_memo       text,
-  download_count   integer not null default 0,
-  download_limit   integer not null default 3,  -- Signed URL 발급 가능 횟수 (다운 실패 대비 여유분)
   created_at       timestamptz not null default now(),
   approved_at      timestamptz,
-  last_download_at timestamptz
+  delivered_at     timestamptz,                  -- PDF 첨부 메일 발송 성공 시각
+  delivery_error   text                          -- 발송 실패 사유 (관리자 페이지에 표시)
 );
+-- 이전 버전(다운로드 링크 방식) 스키마를 이미 실행했다면 컬럼 정리
+alter table public.orders drop column if exists download_count;
+alter table public.orders drop column if exists download_limit;
+alter table public.orders drop column if exists last_download_at;
+alter table public.orders add column if not exists delivered_at timestamptz;
+alter table public.orders add column if not exists delivery_error text;
 create index if not exists orders_status_created_idx on public.orders (status, created_at desc);
 create index if not exists orders_email_idx on public.orders (email);
 
@@ -133,34 +138,17 @@ as $$
   where order_no = p_order_no and email = lower(trim(p_email));
 $$;
 
--- ---------- 8. RPC: 다운로드 권한 차감 (Edge Function 의 service_role 만 호출) ----------
--- 원자적으로 count +1 하고 파일 경로 반환. 승인 안 됐거나 횟수 소진이면 0 rows.
-create or replace function public.claim_download(p_order_no text, p_email text)
-returns table (file_path text, remaining integer)
-language sql security definer set search_path = public
-as $$
-  update public.orders o
-     set download_count   = o.download_count + 1,
-         last_download_at = now()
-    from public.products p
-   where o.order_no = p_order_no
-     and o.email = lower(trim(p_email))
-     and o.status = 'APPROVED'
-     and o.download_count < o.download_limit
-     and p.id = o.product_id
-  returning p.file_path, o.download_limit - o.download_count;
-$$;
+-- (이전 버전의 다운로드 횟수 차감 함수 제거)
+drop function if exists public.claim_download(text, text);
 
 -- ---------- 9. 권한 ----------
 revoke all on function public.create_order(text, text, text, text, integer) from public;
 revoke all on function public.get_order_status(text, text)               from public;
-revoke all on function public.claim_download(text, text)                 from public, anon, authenticated;
 grant execute on function public.create_order(text, text, text, text, integer) to anon, authenticated;
 grant execute on function public.get_order_status(text, text)               to anon, authenticated;
-grant execute on function public.claim_download(text, text)                 to service_role;
 
 -- ---------- 10. 비공개 Storage 버킷 ----------
--- 정책을 하나도 안 만들면 anon/authenticated 는 접근 불가, service_role 만 Signed URL 생성 가능
+-- 정책을 하나도 안 만들면 anon/authenticated 는 접근 불가, service_role(Edge Function)만 읽을 수 있음
 insert into storage.buckets (id, name, public)
 values ('products', 'products', false)
 on conflict (id) do nothing;
