@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>기말고사 문제은행</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20shape-rendering%3D%22crispEdges%22%20aria-hidden%3D%22true%22%3E%3Cpath%20fill%3D%22%237c2d12%22%20d%3D%22M3%204h2v1h-2zM3%205h1v1h-1zM5%205h1v1h-1zM11%205h2v1h-2zM2%206h1v1h-1zM13%206h1v1h-1zM1%207h1v1h-1zM14%207h1v1h-1zM0%208h1v1h-1zM14%208h2v1h-2zM0%209h1v1h-1zM14%209h1v1h-1zM0%2010h1v1h-1zM14%2010h1v1h-1zM1%2011h1v1h-1zM14%2011h1v1h-1zM2%2012h1v1h-1zM13%2012h1v1h-1zM3%2013h10v1h-10zM3%2014h1v1h-1zM5%2014h1v1h-1zM10%2014h1v1h-1zM12%2014h1v1h-1zM3%2015h3v1h-3zM10%2015h3v1h-3z%22%2F%3E%3Cpath%20fill%3D%22%23facc15%22%20d%3D%22M4%205h1v1h-1zM5%206h8v1h-8zM5%207h9v1h-9zM3%208h11v1h-11zM4%209h10v1h-10zM3%2010h10v1h-10zM2%2011h10v1h-10zM4%2012h7v1h-7z%22%2F%3E%3Cpath%20fill%3D%22%23fef08a%22%20d%3D%22M3%206h2v1h-2zM2%207h2v1h-2z%22%2F%3E%3Cpath%20fill%3D%22%23f59e0b%22%20d%3D%22M1%208h2v1h-2zM2%209h1v1h-1zM1%2010h2v1h-2zM13%2010h1v1h-1zM12%2011h2v1h-2zM3%2012h1v1h-1zM11%2012h2v1h-2zM4%2014h1v1h-1zM11%2014h1v1h-1z%22%2F%3E%3Cpath%20fill%3D%22%23b45309%22%20d%3D%22M1%209h1v1h-1zM3%209h1v1h-1z%22%2F%3E%3Cpath%20fill%3D%22%231e1b4b%22%20d%3D%22M4%207h1v1h-1z%22%2F%3E%3Cpath%20fill%3D%22%2314123a%22%20d%3D%22M6%205h5v1h-5z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20d%3D%22M6%200h4v1h-4zM6%201h3v1h-3zM10%201h1v1h-1zM7%202h1v1h-1zM9%202h2v1h-2zM6%203h1v1h-1zM8%203h3v1h-3zM6%204h5v1h-5z%22%2F%3E%3Cpath%20fill%3D%22%238b5cf6%22%20d%3D%22M10%200h1v1h-1zM9%201h1v1h-1zM6%202h1v1h-1zM8%202h1v1h-1zM7%203h1v1h-1z%22%2F%3E%3C%2Fsvg%3E" />
+  <meta name="description" content="학교별 내신 변형 문제 족집게 PDF. 무료 샘플을 먼저 확인해 보세요." />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Supabase 연동 (CONFIG.supabase 를 채우면 자동 활성화, 비워두면 LocalStorage 전용 모드) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.1/dist/umd/supabase.js"></script>
+  <script>
+    if (window.tailwind) tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Pretendard Variable"', 'Pretendard', 'system-ui', 'sans-serif'] },
+          colors: {
+            navy: { DEFAULT: '#1e1b4b', 900: '#14123a', 800: '#1e1b4b', 700: '#2e2a6b', 600: '#3d3889' },
+            point: { yellow: '#facc15', violet: '#8b5cf6' },
+          },
+          boxShadow: { glow: '0 10px 40px -10px rgba(139,92,246,.55)' },
+        },
+      },
+    };
+  </script>
+  <style>
+    html { -webkit-tap-highlight-color: transparent; }
+    body { font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; background: #f8f7ff; }
+    .modal { display: none; }
+    .modal.open { display: flex; }
+    .modal.open .modal-panel { animation: up .22s ease-out; }
+    @keyframes up { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+    .pay-active, .dlv-active { border-color: #8b5cf6; background: #f5f3ff; box-shadow: 0 0 0 3px rgba(139,92,246,.18); }
+    .toast { transition: opacity .2s, transform .2s; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased">
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="sticky top-0 z-30 bg-navy/95 backdrop-blur text-white">
+    <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-2 font-extrabold tracking-tight">
+        <!-- 픽셀 로고 16x16 (돼지저금통 + 체크된 시험지). 한 글자 = 한 픽셀, '.' = 투명
+               ......WWWWV.....
+               ......WWWVW.....
+               ......VWVWW.....
+               ......WVWWW.....
+               ...KK.WWWWW.....
+               ...KYKSSSSSKK...
+               ..KLLYYYYYYYYK..
+               .KLLEYYYYYYYYYK.
+               KOOYYYYYYYYYYYKK
+               KNONYYYYYYYYYYK.
+               KOOYYYYYYYYYYOK.
+               .KYYYYYYYYYYOOK.
+               ..KOYYYYYYYOOK..
+               ...KKKKKKKKKK...
+               ...KOK....KOK...
+               ...KKK....KKK...
+               K=#7c2d12 Y=#facc15 L=#fef08a O=#f59e0b N=#b45309 E=#1e1b4b S=#14123a W=#ffffff V=#8b5cf6 -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="32" height="32" shape-rendering="crispEdges" class="w-8 h-8 shrink-0" aria-hidden="true"><path fill="#7c2d12" d="M3 4h2v1h-2zM3 5h1v1h-1zM5 5h1v1h-1zM11 5h2v1h-2zM2 6h1v1h-1zM13 6h1v1h-1zM1 7h1v1h-1zM14 7h1v1h-1zM0 8h1v1h-1zM14 8h2v1h-2zM0 9h1v1h-1zM14 9h1v1h-1zM0 10h1v1h-1zM14 10h1v1h-1zM1 11h1v1h-1zM14 11h1v1h-1zM2 12h1v1h-1zM13 12h1v1h-1zM3 13h10v1h-10zM3 14h1v1h-1zM5 14h1v1h-1zM10 14h1v1h-1zM12 14h1v1h-1zM3 15h3v1h-3zM10 15h3v1h-3z"/><path fill="#facc15" d="M4 5h1v1h-1zM5 6h8v1h-8zM5 7h9v1h-9zM3 8h11v1h-11zM4 9h10v1h-10zM3 10h10v1h-10zM2 11h10v1h-10zM4 12h7v1h-7z"/><path fill="#fef08a" d="M3 6h2v1h-2zM2 7h2v1h-2z"/><path fill="#f59e0b" d="M1 8h2v1h-2zM2 9h1v1h-1zM1 10h2v1h-2zM13 10h1v1h-1zM12 11h2v1h-2zM3 12h1v1h-1zM11 12h2v1h-2zM4 14h1v1h-1zM11 14h1v1h-1z"/><path fill="#b45309" d="M1 9h1v1h-1zM3 9h1v1h-1z"/><path fill="#1e1b4b" d="M4 7h1v1h-1z"/><path fill="#14123a" d="M6 5h5v1h-5z"/><path fill="#ffffff" d="M6 0h4v1h-4zM6 1h3v1h-3zM10 1h1v1h-1zM7 2h1v1h-1zM9 2h2v1h-2zM6 3h1v1h-1zM8 3h3v1h-3zM6 4h5v1h-5z"/><path fill="#8b5cf6" d="M10 0h1v1h-1zM9 1h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM7 3h1v1h-1z"/></svg>
+        기말고사 문제은행
+      </a>
+      <button id="btnMyOrders" class="text-sm font-semibold px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20">
+        내 주문 내역 <span id="orderBadge" class="hidden ml-1 px-1.5 rounded-full bg-point-yellow text-navy text-xs">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== HERO ===================== -->
+  <section class="relative overflow-hidden bg-navy text-white">
+    <div class="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-point-violet/40 blur-3xl"></div>
+    <div class="absolute -bottom-32 -left-20 w-72 h-72 rounded-full bg-point-yellow/20 blur-3xl"></div>
+    <div class="relative max-w-5xl mx-auto px-4 pt-12 pb-16 md:pt-20 md:pb-24">
+      <span class="inline-block text-xs font-bold px-3 py-1 rounded-full bg-point-yellow text-navy">고2 기말고사 대비 자료 오픈</span>
+      <h1 class="mt-4 text-[2rem] leading-tight md:text-5xl font-extrabold tracking-tight">
+        시험에 나올 문제,<br />
+        <span class="text-point-yellow">미리</span> 풀어보세요.
+      </h1>
+      <p class="mt-4 text-white/75 text-base md:text-lg max-w-xl">
+        교과서와 부교재 본문을 바탕으로 출제 경향에 맞춰 변형한 내신 대비 문제입니다.
+        무료 샘플을 먼저 확인하신 뒤 구매하실 수 있습니다.
+      </p>
+      <div class="mt-8 flex flex-col sm:flex-row gap-3">
+        <button id="heroSample" class="h-12 px-6 rounded-xl bg-white text-navy font-bold hover:bg-white/90">📄 무료 샘플 PDF 보기</button>
+        <button id="heroBuy" class="h-12 px-6 rounded-xl bg-point-yellow text-navy font-extrabold shadow-glow hover:brightness-95">🎯 풀버전 족집게 결제하기</button>
+      </div>
+      <dl class="mt-10 flex gap-3 max-w-md text-center">
+        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">PDF 자료</dt><dd class="text-xl font-extrabold" id="statPdfs">-</dd></div>
+        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">무료 샘플</dt><dd class="text-xl font-extrabold" id="statSamples">-</dd></div>
+        <div class="flex-1 rounded-xl bg-white/5 py-3"><dt class="text-xs text-white/60">받는 방법</dt><dd class="text-xl font-extrabold">메일·DM</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ===================== PRODUCTS ===================== -->
+  <main class="max-w-5xl mx-auto px-4 -mt-6 relative pb-20">
+    <section id="products" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 md:p-6">
+      <div class="flex items-end justify-between gap-3">
+        <div>
+          <h2 class="text-xl md:text-2xl font-extrabold text-navy">과목별 족집게 자료</h2>
+          <p class="text-sm text-slate-500 mt-1">과목별 무료 샘플을 확인하신 뒤 구매해 주세요.</p>
+        </div>
+      </div>
+
+      <!-- 상품 카드 -->
+      <div id="productGrid" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+    </section>
+
+    <!-- 이용 안내 -->
+    <section class="mt-8 grid gap-3 md:grid-cols-3">
+      <div class="rounded-2xl bg-white border border-slate-100 p-5">
+        <div class="text-2xl">① 📄</div>
+        <h3 class="mt-2 font-bold text-navy">샘플 확인</h3>
+        <p class="text-sm text-slate-500 mt-1">과목 카드에서 무료 샘플 PDF를 바로 확인하실 수 있습니다.</p>
+      </div>
+      <div class="rounded-2xl bg-white border border-slate-100 p-5">
+        <div class="text-2xl">② 💸</div>
+        <h3 class="mt-2 font-bold text-navy">송금 및 확인 요청</h3>
+        <p class="text-sm text-slate-500 mt-1">카카오페이, 계좌이체, 토스 중 편하신 방법으로 송금한 뒤 입금 확인을 요청해 주세요.</p>
+      </div>
+      <div class="rounded-2xl bg-white border border-slate-100 p-5">
+        <div class="text-2xl">③ 📩</div>
+        <h3 class="mt-2 font-bold text-navy">PDF 수령</h3>
+        <p class="text-sm text-slate-500 mt-1">입금이 확인되면 이메일로 PDF를 첨부해 보내드리거나, 인스타그램 DM으로 다운로드 링크(5시간 유효)를 보내드립니다.</p>
+      </div>
+    </section>
+
+    <footer class="mt-12 text-center text-xs text-slate-400 leading-relaxed">
+      © 기말고사 문제은행 · 본 자료는 개인 학습용이며 무단 배포·재판매를 금지합니다.
+    </footer>
+  </main>
+
+  <!-- ===================== MODAL: PDF PREVIEW ===================== -->
+  <div id="pdfModal" class="modal fixed inset-0 z-50 bg-black/60 items-end md:items-center justify-center" data-modal>
+    <div class="modal-panel w-full md:max-w-3xl h-[92vh] md:h-[85vh] bg-white rounded-t-2xl md:rounded-2xl flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-4 h-14 border-b border-slate-100 shrink-0">
+        <div class="min-w-0">
+          <p class="text-xs text-point-violet font-bold">무료 샘플</p>
+          <h3 id="pdfTitle" class="font-bold text-navy truncate">-</h3>
+        </div>
+        <button class="w-9 h-9 rounded-full hover:bg-slate-100 text-xl" data-close aria-label="닫기">×</button>
+      </div>
+      <div class="relative flex-1 bg-slate-100">
+        <div id="pdfLoading" class="absolute inset-0 grid place-items-center text-slate-400 text-sm">PDF 불러오는 중...</div>
+        <iframe id="pdfFrame" class="absolute inset-0 w-full h-full hidden" title="샘플 PDF 미리보기"></iframe>
+        <div id="pdfFallback" class="absolute inset-0 hidden flex-col items-center justify-center text-center p-6">
+          <div class="text-5xl">📄</div>
+          <p class="mt-3 font-bold text-navy">미리보기를 표시할 수 없습니다</p>
+          <p class="mt-1 text-sm text-slate-500" id="pdfFallbackMsg">파일을 내려받아 확인해 주세요.</p>
+        </div>
+      </div>
+      <div class="p-3 border-t border-slate-100 grid grid-cols-2 gap-2 shrink-0">
+        <a id="pdfDownload" class="h-11 rounded-xl border border-slate-200 font-semibold grid place-items-center" href="#" download>샘플 다운로드</a>
+        <button id="pdfBuy" class="h-11 rounded-xl bg-navy text-white font-bold">풀버전 구매하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: CHECKOUT ===================== -->
+  <div id="payModal" class="modal fixed inset-0 z-50 bg-black/60 items-end md:items-center justify-center" data-modal>
+    <div class="modal-panel w-full md:max-w-lg max-h-[94vh] bg-white rounded-t-2xl md:rounded-2xl flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-5 h-14 border-b border-slate-100 shrink-0">
+        <h3 class="font-extrabold text-navy">결제 · 송금 안내</h3>
+        <button class="w-9 h-9 rounded-full hover:bg-slate-100 text-xl" data-close aria-label="닫기">×</button>
+      </div>
+
+      <form id="payForm" class="flex-1 overflow-y-auto px-5 py-4 space-y-5" novalidate>
+        <!-- 구매자 정보 -->
+        <fieldset class="space-y-3">
+          <legend class="text-sm font-bold text-navy mb-1">1. 구매자 정보</legend>
+          <label class="block">
+            <span class="text-xs font-semibold text-slate-500">구매 과목</span>
+            <select id="fSubject" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-point-violet"></select>
+          </label>
+          <label class="block">
+            <span class="text-xs font-semibold text-slate-500">입금자명 <span class="text-rose-500">*</span></span>
+            <input id="fName" type="text" maxlength="20" autocomplete="name" placeholder="송금 시 표시되는 이름과 동일하게 입력" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
+          </label>
+          <div>
+            <span class="text-xs font-semibold text-slate-500">PDF 받는 방법</span>
+            <div class="mt-1 grid grid-cols-2 gap-2" role="radiogroup">
+              <label class="dlv-opt cursor-pointer h-11 rounded-xl border-2 border-slate-200 grid place-items-center text-sm font-bold" data-delivery="EMAIL">
+                <input type="radio" name="delivery" value="EMAIL" class="sr-only" checked />이메일
+              </label>
+              <label class="dlv-opt cursor-pointer h-11 rounded-xl border-2 border-slate-200 grid place-items-center text-sm font-bold" data-delivery="INSTAGRAM">
+                <input type="radio" name="delivery" value="INSTAGRAM" class="sr-only" />인스타그램 DM
+              </label>
+            </div>
+          </div>
+          <div data-dlv-pane="EMAIL" class="space-y-3">
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">이메일 주소 <span class="text-rose-500">*</span></span>
+              <input id="fEmail" type="email" autocomplete="email" inputmode="email" placeholder="PDF를 받으실 이메일 주소" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
+            </label>
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">이메일 주소 확인 <span class="text-rose-500">*</span></span>
+              <input id="fEmail2" type="email" autocomplete="off" inputmode="email" placeholder="이메일 주소를 한 번 더 입력" class="mt-1 w-full h-11 rounded-xl border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-point-violet" />
+              <span class="block mt-1 text-[11px] text-slate-400">입금이 확인되면 이 주소로 PDF 파일이 첨부되어 발송됩니다. 정확하게 입력해 주세요.</span>
+            </label>
+          </div>
+          <div data-dlv-pane="INSTAGRAM" class="space-y-3 hidden">
+            <label class="block">
+              <span class="text-xs font-semibold text-slate-500">인스타그램 아이디 <span class="text-rose-500">*</span></span>
+              <div class="mt-1 flex items-center h-11 rounded-xl border border-slate-200 px-3 focus-within:ring-2 focus-within:ring-point-violet">
+                <span class="text-slate-400 mr-1">@</span>
+                <input id="fInsta" type="text" maxlength="31" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="instagram_id" class="flex-1 min-w-0 h-full focus:outline-none" />
+              </div>
+              <span class="block mt-1 text-[11px] text-slate-400 leading-relaxed">입금이 확인되면 <b id="shopInsta1">@-</b> 계정에서 DM으로 다운로드 링크를 보내드립니다. 링크는 발급 후 <b>5시간</b> 동안만 유효하니 받으시는 대로 내려받아 주세요. DM이 '메시지 요청'함에 도착할 수 있습니다.</span>
+            </label>
+          </div>
+          <p id="formError" class="hidden text-sm text-rose-600 font-semibold"></p>
+        </fieldset>
+
+        <!-- 결제 금액 -->
+        <div class="rounded-xl bg-navy text-white px-4 py-3 flex items-center justify-between">
+          <span class="text-sm text-white/70">결제 금액</span>
+          <span class="text-xl font-extrabold"><span id="payAmount">0</span>원</span>
+        </div>
+
+        <!-- 송금 방식 -->
+        <fieldset>
+          <legend class="text-sm font-bold text-navy mb-2">2. 송금 방식</legend>
+          <div class="grid grid-cols-3 gap-2" role="radiogroup">
+            <label class="pay-opt cursor-pointer rounded-xl border-2 border-slate-200 p-3 text-center" data-method="KAKAOPAY">
+              <input type="radio" name="method" value="KAKAOPAY" class="sr-only" checked />
+              <div class="text-xl">💛</div><div class="text-xs font-bold mt-1">카카오페이</div>
+            </label>
+            <label class="pay-opt cursor-pointer rounded-xl border-2 border-slate-200 p-3 text-center" data-method="BANK">
+              <input type="radio" name="method" value="BANK" class="sr-only" />
+              <div class="text-xl">🏦</div><div class="text-xs font-bold mt-1">계좌이체</div>
+            </label>
+            <label class="pay-opt cursor-pointer rounded-xl border-2 border-slate-200 p-3 text-center" data-method="TOSS">
+              <input type="radio" name="method" value="TOSS" class="sr-only" />
+              <div class="text-xl">💙</div><div class="text-xs font-bold mt-1">토스/기타</div>
+            </label>
+          </div>
+
+          <!-- 방식별 안내 -->
+          <div class="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <p id="methodGuide" class="text-sm text-slate-600 leading-relaxed"></p>
+
+            <!-- 카카오페이 -->
+            <div data-pane="KAKAOPAY" class="mt-3 space-y-3">
+              <a id="kakaoLink" target="_blank" rel="noopener" class="h-11 w-full rounded-xl bg-[#FEE500] text-[#191919] font-bold grid place-items-center">카카오페이로 송금하기</a>
+              <div class="hidden md:flex flex-col items-center gap-2">
+                <div id="kakaoQR" class="p-2 bg-white rounded-lg"></div>
+                <span class="text-xs text-slate-400">PC에서는 휴대폰 카메라로 QR 코드를 스캔해 주세요</span>
+              </div>
+            </div>
+
+            <!-- 계좌이체 -->
+            <div data-pane="BANK" class="mt-3 hidden">
+              <button type="button" id="copyAccount" class="w-full text-left rounded-xl bg-white border border-slate-200 p-4 hover:border-point-violet">
+                <div class="text-xs text-slate-400" id="bankName">-</div>
+                <div class="text-lg font-extrabold text-navy tracking-wide" id="bankNumber">-</div>
+                <div class="flex items-center justify-between mt-1">
+                  <span class="text-xs text-slate-500">예금주 <b id="bankHolder">-</b></span>
+                  <span class="text-xs font-bold text-point-violet">눌러서 복사</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- 토스 -->
+            <div data-pane="TOSS" class="mt-3 hidden space-y-3">
+              <a id="tossLink" target="_blank" rel="noopener" class="h-11 w-full rounded-xl bg-[#0064FF] text-white font-bold grid place-items-center">토스로 송금하기</a>
+              <div class="hidden md:flex flex-col items-center gap-2">
+                <div id="tossQR" class="p-2 bg-white rounded-lg"></div>
+                <span class="text-xs text-slate-400">PC에서는 휴대폰 카메라로 QR 코드를 스캔해 주세요</span>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <label class="flex items-start gap-2 text-xs text-slate-500">
+          <input id="fAgree" type="checkbox" class="mt-0.5 accent-[#8b5cf6]" />
+          <span>송금을 완료했으며, 구매한 PDF를 무단 공유·재판매하지 않겠습니다.</span>
+        </label>
+      </form>
+
+      <div class="p-4 border-t border-slate-100 shrink-0">
+        <button id="submitOrder" class="h-12 w-full rounded-xl bg-point-yellow text-navy font-extrabold disabled:opacity-50">입금 완료 · 확인 요청하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: DONE ===================== -->
+  <div id="doneModal" class="modal fixed inset-0 z-50 bg-black/60 items-center justify-center p-4" data-modal>
+    <div class="modal-panel w-full max-w-sm bg-white rounded-2xl p-6 text-center">
+      <div class="mx-auto w-16 h-16 rounded-full bg-point-violet/10 grid place-items-center text-3xl">✅</div>
+      <h3 class="mt-4 text-lg font-extrabold text-navy">입금 확인 요청이 접수되었습니다</h3>
+      <p class="mt-2 text-sm text-slate-500 leading-relaxed">
+        주문번호 <b id="doneOrderNo" class="text-navy">-</b><br />
+        <span id="doneMsg">-</span>
+      </p>
+      <a id="doneInstaDM" target="_blank" rel="noopener" class="hidden mt-4 h-11 rounded-xl bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] text-white font-bold grid place-items-center">주문번호 DM 보내기</a>
+      <div class="mt-5 grid gap-2">
+        <button id="doneToOrders" class="h-11 rounded-xl bg-navy text-white font-bold">내 주문 내역 확인</button>
+        <button class="h-11 rounded-xl border border-slate-200 font-semibold" data-close>닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL: MY ORDERS ===================== -->
+  <div id="ordersModal" class="modal fixed inset-0 z-50 bg-black/60 items-end md:items-center justify-center" data-modal>
+    <div class="modal-panel w-full md:max-w-lg max-h-[90vh] bg-white rounded-t-2xl md:rounded-2xl flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between px-5 h-14 border-b border-slate-100 shrink-0">
+        <h3 class="font-extrabold text-navy">내 주문 내역</h3>
+        <div class="flex items-center gap-1">
+          <button id="refreshOrders" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200">↻ 상태 새로고침</button>
+          <button class="w-9 h-9 rounded-full hover:bg-slate-100 text-xl" data-close aria-label="닫기">×</button>
+        </div>
+      </div>
+      <div id="orderList" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+      <p class="px-5 pb-4 text-[11px] text-slate-400">주문 내역은 이 브라우저에만 저장됩니다. 다른 기기에서는 확인하실 수 없으니 주문번호를 따로 보관해 주세요.</p>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast fixed left-1/2 -translate-x-1/2 bottom-6 z-[60] px-4 py-2.5 rounded-full bg-navy text-white text-sm font-semibold shadow-lg opacity-0 pointer-events-none translate-y-2"></div>
+
+<script>
+/* =========================================================
+ * CONFIG — 여기만 수정하면 됨
+ * ========================================================= */
+const CONFIG = {
+  // 카카오페이 앱 > 송금 > 송금코드(QR) 에서 받은 링크 (예: https://qr.kakaopay.com/XXXXXXXX)
+  kakaoPayLink: 'https://qr.kakaopay.com/YOUR_CODE',
+  // 토스 앱 > 전체 > 토스아이디 에서 만든 링크 (예: https://toss.me/아이디)
+  tossLink: 'https://toss.me/YOUR_ID',
+  bank: { name: '토스뱅크', number: '1000-0000-0000', holder: '홍길동' },
+  // 다운로드 링크를 DM 으로 보낼 판매자 인스타그램 아이디 (@ 제외)
+  instagramId: 'YOUR_INSTA_ID',
+  // Supabase 연동 (둘 다 채우면 주문이 서버에 저장되고, 관리자 승인 시 PDF 가 이메일로 발송됨)
+  supabase: { url: '', anonKey: '' },
+};
+
+// Supabase 미연동 시 보여줄 기본 패키지 (연동하면 관리자 페이지에서 등록한 패키지를 불러옴)
+let PRODUCTS = [
+  { id: 'h2-eng',  subject: '영어', title: '영어Ⅰ 모의고사 변형',  description: '최근 모의고사 지문을 내신형으로 변형한 문제입니다.',       price: 10900, items: null, sample: 'samples/h2-eng.pdf' },
+  { id: 'h2-kor',  subject: '국어', title: '문학 (천재 김동환)',    description: '현대시·고전시가·소설 작품별 핵심 개념과 변형 문제입니다.', price: 10900, items: null, sample: 'samples/h2-kor.pdf' },
+  { id: 'h2-math', subject: '수학', title: '수학Ⅰ 지수·로그함수',  description: '단원별 기본·심화 문항과 학교 기출 유형 변형을 담았습니다.', price: 9900,  items: null, sample: 'samples/h2-math.pdf' },
+];
+
+const METHOD_GUIDE = {
+  KAKAOPAY: '<b>카카오페이</b> 버튼을 누르면 송금 화면으로 이동합니다(PC에서는 QR 코드 스캔). <b>{amount}원</b>을 송금하시고, 메모란에 <b>입금자명</b>을 입력해 주세요.',
+  BANK:     '아래 계좌를 누르면 계좌번호가 복사됩니다. 위에 입력하신 <b>입금자명</b>으로 <b>{amount}원</b>을 이체해 주세요. 입금자명이 다르면 확인이 늦어질 수 있습니다.',
+  TOSS:     '<b>토스</b> 버튼을 누르면 토스 송금 페이지로 이동합니다(PC에서는 QR 코드 스캔). <b>{amount}원</b>을 송금하신 뒤 이 화면으로 돌아와 확인 요청을 눌러 주세요.',
+};
+const STATUS_LABEL = {
+  PENDING:  { text: '입금 확인 중', cls: 'bg-amber-100 text-amber-700' },
+  APPROVED: { text: '입금 확인 완료', cls: 'bg-emerald-100 text-emerald-700' },
+  REJECTED: { text: '입금 미확인',   cls: 'bg-rose-100 text-rose-700' },
+};
+const LS_KEY = 'qb_orders_v1';
+
+/* =========================================================
+ * Utils
+ * ========================================================= */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const won = (n) => Number(n).toLocaleString('ko-KR');
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const productById = (id) => PRODUCTS.find((p) => p.id === id);
+const productLabel = (p) => [p.subject, p.title].filter(Boolean).join(' · ');
+const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+// ig.me 는 앱에서만 DM 창을 열어줌 → PC 에서는 프로필로 이동
+const instaDmUrl = (id) => (isMobile() ? `https://ig.me/m/${id}` : `https://www.instagram.com/${id}/`);
+const contactLabel = (o) => (o.deliveryMethod === 'INSTAGRAM' ? `@${o.instagramId}` : o.email);
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.remove('opacity-0', 'translate-y-2');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('opacity-0', 'translate-y-2'), 1800);
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+}
+
+function genOrderNo() {
+  const d = new Date();
+  const ymd = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const rand = [...crypto.getRandomValues(new Uint8Array(6))].map((b) => alphabet[b % alphabet.length]).join('');
+  return `QB-${ymd}-${rand}`;
+}
+
+/* =========================================================
+ * Storage (LocalStorage)
+ * ========================================================= */
+function loadOrders() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; }
+}
+function saveOrders(orders) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(orders)); } catch { toast('브라우저 저장소를 사용할 수 없습니다. 시크릿 모드를 해제해 주세요.'); }
+  updateBadge();
+}
+function updateBadge() {
+  const n = loadOrders().length;
+  const b = $('#orderBadge');
+  b.textContent = n;
+  b.classList.toggle('hidden', n === 0);
+}
+
+/* =========================================================
+ * Supabase (optional)
+ * ========================================================= */
+const sb = CONFIG.supabase.url && CONFIG.supabase.anonKey && window.supabase
+  ? window.supabase.createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey)
+  : null;
+
+const api = {
+  // 판매 중 + 풀버전 업로드 완료된 패키지만 조회됨 (RLS)
+  async listProducts() {
+    const { data, error } = await sb
+      .from('products')
+      .select('id, subject, title, description, item_count, price, sample_path')
+      .order('sort_order')
+      .order('created_at');
+    if (error) throw error;
+    return data.map((r) => ({
+      id: r.id,
+      subject: r.subject,
+      title: r.title,
+      description: r.description,
+      price: r.price,
+      items: r.item_count,
+      sample: r.sample_path ? sb.storage.from('samples').getPublicUrl(r.sample_path).data.publicUrl : null,
+    }));
+  },
+  // 주문 생성: 금액은 서버가 products 테이블 기준으로 다시 계산함 (클라 금액 조작 방지)
+  async createOrder(o) {
+    const { data, error } = await sb.rpc('create_order', {
+      p_buyer_name: o.buyerName,
+      p_product_id: o.subject,
+      p_payment_method: o.paymentMethod,
+      p_delivery_method: o.deliveryMethod,
+      p_email: o.email || null,
+      p_instagram_id: o.instagramId || null,
+      p_amount: o.amount,
+    });
+    if (error) throw error;
+    return data; // { order_no, amount, status, created_at }
+  },
+  async getStatus(orderNo, contact) {
+    const { data, error } = await sb.rpc('get_order_status', { p_order_no: orderNo, p_contact: contact });
+    if (error) throw error;
+    return data; // 'PENDING' | 'APPROVED' | 'REJECTED' | null
+  },
+};
+
+/* =========================================================
+ * Products
+ * ========================================================= */
+function renderProducts() {
+  const list = PRODUCTS;
+  if (!list.length) {
+    $('#productGrid').innerHTML = `<p class="col-span-full py-12 text-center text-sm text-slate-400">판매 중인 패키지가 없습니다.</p>`;
+    return;
+  }
+  $('#productGrid').innerHTML = list.map((p) => `
+    <article class="group rounded-2xl border border-slate-100 hover:border-point-violet/50 hover:shadow-glow transition p-4 flex flex-col">
+      <div class="flex items-center gap-2 min-h-[20px]">
+        ${p.subject ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-point-violet/10 text-point-violet">${esc(p.subject)}</span>` : ''}
+        ${p.items ? `<span class="ml-auto text-[11px] text-slate-400">${won(p.items)}문항</span>` : ''}
+      </div>
+      <h3 class="mt-3 font-bold text-navy leading-snug">${esc(p.title)}</h3>
+      ${p.description ? `<p class="mt-1 text-sm text-slate-500 leading-relaxed whitespace-pre-line">${esc(p.description)}</p>` : ''}
+      <p class="mt-auto pt-3 text-xl font-extrabold">${won(p.price)}<span class="text-sm font-semibold text-slate-400">원</span></p>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button class="h-10 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40" data-preview="${p.id}" ${p.sample ? '' : 'disabled title="샘플 준비 중"'}>${p.sample ? '샘플 보기' : '샘플 준비 중'}</button>
+        <button class="h-10 rounded-xl bg-navy text-white text-sm font-bold hover:bg-navy-700" data-buy="${p.id}">구매하기</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+/* =========================================================
+ * Modals
+ * ========================================================= */
+function openModal(id) {
+  $('#' + id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(el) {
+  el.classList.remove('open');
+  if (!$$('[data-modal].open').length) document.body.style.overflow = '';
+  if (el.id === 'pdfModal') $('#pdfFrame').src = 'about:blank';
+}
+
+/* =========================================================
+ * PDF Preview
+ * ========================================================= */
+let previewProductId = null;
+
+async function openPreview(id) {
+  const p = productById(id);
+  previewProductId = id;
+  $('#pdfTitle').textContent = productLabel(p);
+  const frame = $('#pdfFrame');
+  const dl = $('#pdfDownload');
+  dl.href = p.sample || '#';
+  dl.setAttribute('download', `${productLabel(p).replace(/[\\/:*?"<>|]/g, '')}_샘플.pdf`);
+  frame.classList.add('hidden');
+  $('#pdfFallback').classList.add('hidden');
+  $('#pdfFallback').classList.remove('flex');
+  $('#pdfLoading').classList.remove('hidden');
+  openModal('pdfModal');
+
+  const fail = (msg) => {
+    $('#pdfLoading').classList.add('hidden');
+    $('#pdfFallbackMsg').textContent = msg;
+    $('#pdfFallback').classList.remove('hidden');
+    $('#pdfFallback').classList.add('flex');
+  };
+
+  if (!p.sample) return fail('이 패키지는 샘플을 준비 중입니다.');
+  // 같은 사이트에 둔 샘플 파일은 존재 확인 (file:// 로 열면 fetch 가 막히므로 그 경우엔 그냥 iframe 시도)
+  if (location.protocol.startsWith('http') && !/^https?:/.test(p.sample)) {
+    try {
+      const res = await fetch(p.sample, { method: 'HEAD' });
+      if (!res.ok) return fail('샘플 파일이 아직 준비되지 않았습니다. 잠시 후 다시 시도하시거나 문의해 주세요.');
+    } catch {
+      return fail('네트워크 오류로 샘플을 불러오지 못했습니다. 샘플 다운로드 버튼을 이용해 주세요.');
+    }
+  }
+  // 모바일 브라우저 대부분은 iframe 안에서 PDF 렌더링을 안 해줌 → 새 탭 열기 안내
+  if (isMobile()) {
+    $('#pdfLoading').classList.add('hidden');
+    $('#pdfFallback').classList.remove('hidden');
+    $('#pdfFallback').classList.add('flex');
+    $('#pdfFallbackMsg').innerHTML = `모바일에서는 새 탭에서 열어 확인해 주세요.<br><a class="inline-block mt-3 px-4 h-10 leading-10 rounded-xl bg-point-violet text-white font-bold" href="${esc(p.sample)}" target="_blank" rel="noopener">새 탭에서 열기</a>`;
+    return;
+  }
+  frame.onload = () => { $('#pdfLoading').classList.add('hidden'); frame.classList.remove('hidden'); };
+  frame.src = p.sample + '#toolbar=0&view=FitH';
+}
+
+/* =========================================================
+ * Checkout
+ * ========================================================= */
+let qrRendered = false;
+
+function openCheckout(productId) {
+  const sel = $('#fSubject');
+  sel.innerHTML = PRODUCTS.map((p) => `<option value="${p.id}">${esc(productLabel(p))} — ${won(p.price)}원</option>`).join('');
+  if (productId) sel.value = productId;
+  $('#formError').classList.add('hidden');
+  updateAmount();
+  setDelivery($('input[name="delivery"]:checked').value);
+  openModal('payModal');
+  if (!qrRendered && window.QRCode) {
+    if (CONFIG.kakaoPayLink) new QRCode($('#kakaoQR'), { text: CONFIG.kakaoPayLink, width: 140, height: 140 });
+    if (CONFIG.tossLink) new QRCode($('#tossQR'), { text: CONFIG.tossLink, width: 140, height: 140 });
+    qrRendered = true;
+  }
+}
+
+function setDelivery(method) {
+  $$('.dlv-opt').forEach((el) => el.classList.toggle('dlv-active', el.dataset.delivery === method));
+  $$('[data-dlv-pane]').forEach((el) => el.classList.toggle('hidden', el.dataset.dlvPane !== method));
+}
+
+const normInsta = (v) => v.trim().replace(/^@/, '').toLowerCase();
+
+function currentAmount() { return productById($('#fSubject').value)?.price || 0; }
+
+function updateAmount() {
+  $('#payAmount').textContent = won(currentAmount());
+  setMethod($('input[name="method"]:checked').value);
+}
+
+function setMethod(method) {
+  $$('.pay-opt').forEach((el) => el.classList.toggle('pay-active', el.dataset.method === method));
+  $$('[data-pane]').forEach((el) => el.classList.toggle('hidden', el.dataset.pane !== method));
+  $('#methodGuide').innerHTML = METHOD_GUIDE[method].replaceAll('{amount}', won(currentAmount()));
+}
+
+function validate() {
+  if (!productById($('#fSubject').value)) return '구매할 패키지를 선택해 주세요.';
+  const name = $('#fName').value.trim();
+  if (!name) return '입금자명을 입력해 주세요.';
+  if ($('input[name="delivery"]:checked').value === 'INSTAGRAM') {
+    const id = normInsta($('#fInsta').value);
+    if (!id) return '인스타그램 아이디를 입력해 주세요.';
+    if (!/^(?!\.)(?!.*\.\.)(?!.*\.$)[a-z0-9._]{1,30}$/.test(id)) return '인스타그램 아이디는 영문, 숫자, 마침표(.), 밑줄(_)만 사용할 수 있습니다.';
+  } else {
+    const email = $('#fEmail').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return '이메일 주소 형식을 확인해 주세요.';
+    if (email.toLowerCase() !== $('#fEmail2').value.trim().toLowerCase()) return '이메일 주소가 서로 일치하지 않습니다.';
+  }
+  if (!$('#fAgree').checked) return '송금 완료 및 이용 동의에 체크해 주세요.';
+  return null;
+}
+
+async function submitOrder() {
+  const err = validate();
+  const errEl = $('#formError');
+  if (err) { errEl.textContent = err; errEl.classList.remove('hidden'); return; }
+  errEl.classList.add('hidden');
+
+  const btn = $('#submitOrder');
+  btn.disabled = true;
+  btn.textContent = '요청을 보내는 중입니다...';
+
+  const order = {
+    orderNo: genOrderNo(),
+    buyerName: $('#fName').value.trim(),
+    deliveryMethod: $('input[name="delivery"]:checked').value,
+    email: '',
+    instagramId: '',
+    subject: $('#fSubject').value,
+    paymentMethod: $('input[name="method"]:checked').value,
+    amount: currentAmount(),
+    status: 'PENDING',
+    createdAt: new Date().toISOString(),
+    synced: false,
+  };
+  if (order.deliveryMethod === 'INSTAGRAM') order.instagramId = normInsta($('#fInsta').value);
+  else order.email = $('#fEmail').value.trim().toLowerCase();
+
+  try {
+    if (sb) {
+      const row = await api.createOrder(order);
+      Object.assign(order, { orderNo: row.order_no, amount: row.amount, status: row.status, createdAt: row.created_at, synced: true });
+    }
+    const orders = loadOrders();
+    orders.unshift(order);
+    saveOrders(orders);
+
+    $('#payForm').reset();
+    setDelivery('EMAIL');
+    closeModal($('#payModal'));
+    $('#doneOrderNo').textContent = order.orderNo;
+    const dm = $('#doneInstaDM');
+    if (order.deliveryMethod === 'INSTAGRAM') {
+      $('#doneMsg').innerHTML = `입금이 확인되면 <b class="text-navy">@${esc(CONFIG.instagramId)}</b> 계정에서<br /><b class="text-navy">@${esc(order.instagramId)}</b>(으)로 다운로드 링크를 보내드립니다.<br />원활한 전달을 위해 주문번호를 DM으로 먼저 보내 주세요.`;
+      dm.href = instaDmUrl(CONFIG.instagramId);
+      dm.classList.remove('hidden');
+    } else {
+      $('#doneMsg').innerHTML = `입금이 확인되면 <b class="text-navy break-all">${esc(order.email)}</b>(으)로<br />풀버전 PDF를 보내드립니다.`;
+      dm.classList.add('hidden');
+    }
+    openModal('doneModal');
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = '요청을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '입금 완료 · 확인 요청하기';
+  }
+}
+
+/* =========================================================
+ * My Orders
+ * ========================================================= */
+function renderOrders() {
+  const orders = loadOrders();
+  if (!orders.length) {
+    $('#orderList').innerHTML = `<div class="py-16 text-center text-slate-400 text-sm">주문 내역이 없습니다.</div>`;
+    return;
+  }
+  $('#orderList').innerHTML = orders.map((o) => {
+    const p = productById(o.subject);
+    const st = STATUS_LABEL[o.status] || STATUS_LABEL.PENDING;
+    return `
+      <div class="rounded-xl border border-slate-100 p-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-mono text-slate-500">${esc(o.orderNo)}</span>
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${st.cls}">${st.text}</span>
+        </div>
+        <p class="mt-2 font-bold text-navy">${esc(p ? productLabel(p) : o.subject)}</p>
+        <p class="text-xs text-slate-500 mt-1">${esc(o.buyerName)} · ${won(o.amount)}원 · ${new Date(o.createdAt).toLocaleString('ko-KR')}</p>
+        <p class="text-xs text-slate-500">받는 곳: ${o.deliveryMethod === 'INSTAGRAM' ? '인스타그램 DM ' : '이메일 '}<b>${esc(contactLabel(o) || '-')}</b></p>
+        ${o.status === 'APPROVED' && o.deliveryMethod === 'INSTAGRAM' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed"><b>@${esc(CONFIG.instagramId)}</b> 계정에서 DM으로 다운로드 링크를 보내드립니다. 링크는 발급 후 5시간 동안 유효합니다. DM이 보이지 않으면 '메시지 요청'함을 확인해 주세요.</p>` : ''}
+        ${o.status === 'APPROVED' && o.deliveryMethod !== 'INSTAGRAM' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed"><b>${esc(o.email)}</b>(으)로 PDF를 보내드렸습니다. 메일이 보이지 않으면 스팸함을 확인해 주세요.</p>` : ''}
+        ${o.status === 'REJECTED' ? `<p class="mt-3 text-xs text-slate-500 leading-relaxed">입금 내역을 확인하지 못했습니다. 입금자명과 금액을 확인하신 뒤 인스타그램 <b>@${esc(CONFIG.instagramId)}</b>으로 문의해 주세요.</p>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function refreshOrders() {
+  if (!sb) { toast('입금이 확인되면 주문 상태가 변경됩니다.'); return; }
+  const orders = loadOrders();
+  await Promise.all(orders.filter((o) => o.synced).map(async (o) => {
+    try { o.status = (await api.getStatus(o.orderNo, o.email || o.instagramId)) || o.status; } catch (e) { console.warn(e); }
+  }));
+  saveOrders(orders);
+  renderOrders();
+  toast('주문 상태를 새로 불러왔습니다.');
+}
+
+async function openOrders() {
+  renderOrders();
+  openModal('ordersModal');
+  if (sb && loadOrders().some((o) => o.synced && o.status === 'PENDING')) refreshOrders();
+}
+
+/* =========================================================
+ * Init / Events
+ * ========================================================= */
+function renderCatalog() {
+  // 사이트에는 풀버전 PDF 가 올라간 패키지만 오므로 = 판매 중인 PDF 개수
+  $('#statPdfs').textContent = `${PRODUCTS.length}개`;
+  $('#statSamples').textContent = `${PRODUCTS.filter((p) => p.sample).length}개`;
+  renderProducts();
+}
+
+async function loadProducts() {
+  if (!sb) return renderCatalog();
+  $('#productGrid').innerHTML = `<p class="col-span-full py-12 text-center text-sm text-slate-400">패키지를 불러오는 중입니다...</p>`;
+  try {
+    PRODUCTS = await api.listProducts();
+    renderCatalog();
+  } catch (e) {
+    console.error(e);
+    $('#productGrid').innerHTML = `<p class="col-span-full py-12 text-center text-sm text-rose-600">패키지 목록을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</p>`;
+  }
+}
+
+function init() {
+  $('#kakaoLink').href = CONFIG.kakaoPayLink;
+  $('#tossLink').href = CONFIG.tossLink;
+  $('#bankName').textContent = CONFIG.bank.name;
+  $('#bankNumber').textContent = CONFIG.bank.number;
+  $('#bankHolder').textContent = CONFIG.bank.holder;
+  $('#shopInsta1').textContent = '@' + CONFIG.instagramId;
+  loadProducts();
+  updateBadge();
+
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    const pv = t.closest('[data-preview]');
+    if (pv) return openPreview(pv.dataset.preview);
+    const buy = t.closest('[data-buy]');
+    if (buy) return openCheckout(buy.dataset.buy);
+    if (t.closest('[data-close]')) return closeModal(t.closest('[data-modal]'));
+    if (t.matches('[data-modal]')) return closeModal(t); // 바깥 영역 클릭
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') $$('[data-modal].open').forEach(closeModal);
+  });
+
+  $('#heroSample').onclick = () => {
+    const p = PRODUCTS.find((x) => x.sample);
+    if (p) openPreview(p.id);
+    else toast('준비된 샘플이 아직 없습니다.');
+  };
+  $('#heroBuy').onclick = () => openCheckout();
+  $('#pdfBuy').onclick = () => { closeModal($('#pdfModal')); openCheckout(previewProductId); };
+  $('#btnMyOrders').onclick = openOrders;
+  $('#doneToOrders').onclick = () => { closeModal($('#doneModal')); openOrders(); };
+  $('#refreshOrders').onclick = refreshOrders;
+  $('#fSubject').onchange = updateAmount;
+  $$('input[name="method"]').forEach((r) => (r.onchange = () => setMethod(r.value)));
+  $$('input[name="delivery"]').forEach((r) => (r.onchange = () => setDelivery(r.value)));
+  $('#copyAccount').onclick = async () => {
+    await copyText(`${CONFIG.bank.name} ${CONFIG.bank.number.replace(/-/g, '')}`);
+    toast('계좌번호가 복사되었습니다.');
+  };
+  $('#submitOrder').onclick = submitOrder;
+}
+
+init();
+</script>
+</body>
+</html>
