@@ -6,21 +6,32 @@ import type { AdminOverview } from "@/lib/orders";
 
 type O = AdminOverview["orders"][number];
 
-const METHOD = { BANK: "계좌이체", KAKAOPAY: "카카오페이", TOSS: "토스" } as const;
 const STATUS: Record<O["status"], { label: string; tone: "wait" | "ok" | "bad" | "idle" }> = {
-  PENDING_VERIFICATION: { label: "입금 확인 대기", tone: "wait" },
-  NOTIFIED_USER: { label: "접수 안내 완료, 입금 확인 대기", tone: "wait" },
-  APPROVED: { label: "승인됨 · 링크 전달 대기", tone: "ok" },
-  DISPATCHING: { label: "발송 중", tone: "ok" },
+  PENDING_VERIFICATION: { label: "1단계: 승인 대기", tone: "wait" },
+  NOTIFIED_USER: { label: "1단계: 승인 대기", tone: "wait" },
+  APPROVED: { label: "2단계: 링크 발급됨 (발송 대기)", tone: "ok" },
+  DISPATCHING: { label: "2단계: 발송 중", tone: "ok" },
   DELIVERED: { label: "발송 완료", tone: "ok" },
   DISPATCH_FAILED: { label: "발송 실패", tone: "bad" },
   EXPIRED: { label: "링크 만료", tone: "idle" },
   REJECTED: { label: "입금 미확인", tone: "bad" },
 };
 
+const CHANNEL_LABEL = {
+  INSTAGRAM_DM: "인스타그램 DM",
+  EMAIL: "이메일",
+  BOTH: "인스타그램 DM + 이메일",
+} as const;
+
+// 첫 번째 탭('todo')에 승인 대기 + 링크 전달 대기를 모두 표시해 피클 AI가 탭 이동 없이 한 화면에서 처리하도록 구성
 const TABS = [
-  { id: "todo", label: "확인 대기", match: (o: O) => ["PENDING_VERIFICATION", "NOTIFIED_USER"].includes(o.status) || !!o.reissueRequestedAt },
-  { id: "sending", label: "링크 전달 대기", match: (o: O) => ["APPROVED", "DISPATCHING", "DISPATCH_FAILED"].includes(o.status) },
+  {
+    id: "todo",
+    label: "처리할 주문",
+    match: (o: O) =>
+      ["PENDING_VERIFICATION", "NOTIFIED_USER", "APPROVED", "DISPATCHING", "DISPATCH_FAILED"].includes(o.status) ||
+      !!o.reissueRequestedAt,
+  },
   { id: "done", label: "완료", match: (o: O) => ["DELIVERED", "EXPIRED", "REJECTED"].includes(o.status) },
   { id: "all", label: "전체", match: () => true },
 ] as const;
@@ -90,20 +101,20 @@ export function AgentConsole({
           {shown.map((o) => (
             <OrderCard key={o.id} o={o} busy={busy} act={act} now={data.now} />
           ))}
-          {shown.length === 0 ? <li className="orders__none">이 분류에 해당하는 주문이 없습니다.</li> : null}
+          {shown.length === 0 ? <li className="orders__none">처리할 주문이 없습니다.</li> : null}
         </ul>
       </div>
 
       <aside className="console__side" aria-label="연동 및 작업 상태">
         <div className="panel">
-          <h2>클라우드·발송 연동</h2>
+          <h2>발송 처리 순서 (피클 AI)</h2>
           <dl className="kv">
-            <div><dt>저장소</dt><dd data-tone="ok">Supabase (DB · Storage)</dd></div>
-            <div><dt>인스타 운영</dt><dd data-tone="ok">{pickleWebhookReady ? "피클 AI (웹훅 + API)" : "피클 AI (링크 복사 / API 조회)"}</dd></div>
-            <div><dt>이메일 발송</dt><dd data-tone={emailReady ? "ok" : "idle"}>{emailReady ? "Gmail 자동 발송 활성" : "수동 링크 전달 (GMAIL 미설정)"}</dd></div>
+            <div><dt>1단계</dt><dd><b>[1. 승인 및 5시간 링크 생성]</b> 클릭</dd></div>
+            <div><dt>2단계</dt><dd>생성된 <b>발송 문구</b>를 복사해 구매자가 선택한 곳(인스타 DM 또는 이메일)으로 전송</dd></div>
+            <div><dt>3단계</dt><dd><b>[3. 발송 완료 처리]</b> 클릭 (완료 탭으로 이동)</dd></div>
           </dl>
           <p className="panel__hint">
-            주문을 승인하면 <b>5시간 유효 · 구매자 워터마크 적용</b> 다운로드 링크가 즉시 발급됩니다. 피클 AI는 <code>/api/pickle/order</code> API로 링크를 자동 조회하거나, 각 주문 카드에서 1클릭으로 복사해 전달할 수 있습니다.
+            저장소: Supabase · 이메일 서버 발송: {emailReady ? "활성" : "피클 AI 직접 발송"} · 웹훅: {pickleWebhookReady ? "활성" : "미사용"}
           </p>
         </div>
 
@@ -126,8 +137,8 @@ export function AgentConsole({
 
 function OrderCard({ o, busy, act, now }: { o: O; busy: string | null; act: (k: string, u: string, t: string) => void; now: number }) {
   const [confirmReject, setConfirmReject] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const s = STATUS[o.status];
   const pending = ["PENDING_VERIFICATION", "NOTIFIED_USER"].includes(o.status);
@@ -150,24 +161,41 @@ function OrderCard({ o, busy, act, now }: { o: O; busy: string | null; act: (k: 
           <span>입금자명</span>
           <b>{o.depositorName}</b>
           <span className="num order__amount">{won(o.totalAmount)}원</span>
-          <span>{METHOD[o.paymentMethod]}</span>
+          <span>계좌이체</span>
         </div>
         <dl className="kv">
           <div><dt>자료</dt><dd>{o.productLabel}</dd></div>
           <div><dt>구매자</dt><dd>{o.buyerName} <span className="num">({o.buyerPhone})</span></dd></div>
-          {o.buyerInstagram ? <div><dt>인스타그램</dt><dd className="num">@{o.buyerInstagram}</dd></div> : null}
-          {o.buyerEmail ? <div><dt>이메일</dt><dd className="num">{o.buyerEmail}</dd></div> : null}
+          <div><dt>보낼 곳</dt><dd><b>{CHANNEL_LABEL[o.preferredChannel]}</b></dd></div>
+          {o.buyerInstagram ? <div><dt>인스타 아이디</dt><dd className="num">@{o.buyerInstagram}</dd></div> : null}
+          {o.buyerEmail ? <div><dt>이메일 주소</dt><dd className="num">{o.buyerEmail}</dd></div> : null}
           {o.token ? (
             <div><dt>링크 상태</dt><dd className="num" data-tone={expired ? "bad" : undefined}>{expired ? "만료됨" : `${formatKst(o.token.expiresAt)}까지`} · {o.token.downloadCount}/{o.token.maxDownloads}회 사용</dd></div>
           ) : null}
-          {o.emailSentAt ? <div><dt>이메일 발송</dt><dd className="num">{formatKst(o.emailSentAt)} 완료</dd></div> : null}
-          {o.emailError ? <div><dt>이메일 안내</dt><dd>{o.emailError}</dd></div> : null}
         </dl>
       </div>
 
-      {o.downloadUrl ? (
-        <div className="fallback" role="group" aria-label="다운로드 링크 및 피클 AI / DM 전달">
-          <p className="num" style={{ wordBreak: "break-all" }}>보안 링크: {o.downloadUrl}</p>
+      {o.downloadUrl && o.dmMessage ? (
+        <div className="fallback" role="group" aria-label="발송할 문구 및 링크">
+          <textarea
+            readOnly
+            rows={4}
+            value={o.dmMessage}
+            aria-label={`주문 ${o.orderNumber} 발송 문구`}
+            style={{ width: "100%", marginBottom: "0.5rem", fontFamily: "inherit", fontSize: "0.9rem" }}
+          />
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            data-agent-action="copy-dm-message"
+            onClick={async () => {
+              await navigator.clipboard.writeText(o.dmMessage ?? "");
+              setCopiedMsg(true);
+              setTimeout(() => setCopiedMsg(false), 2000);
+            }}
+          >
+            {copiedMsg ? "문구 복사됨" : "2. 발송할 전체 문구 복사"}
+          </button>
           <button
             type="button"
             className="btn btn--ghost btn--sm"
@@ -177,24 +205,11 @@ function OrderCard({ o, busy, act, now }: { o: O; busy: string | null; act: (k: 
               setTimeout(() => setCopiedLink(false), 2000);
             }}
           >
-            {copiedLink ? "링크 복사됨" : "1. 링크만 복사"}
+            {copiedLink ? "링크 복사됨" : "링크만 복사"}
           </button>
-          {o.dmMessage ? (
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={async () => {
-                await navigator.clipboard.writeText(o.dmMessage ?? "");
-                setCopiedMsg(true);
-                setTimeout(() => setCopiedMsg(false), 2000);
-              }}
-            >
-              {copiedMsg ? "문구 복사됨" : "2. 전체 안내 문구 복사"}
-            </button>
-          ) : null}
           {o.buyerInstagram ? (
-            <a className="btn btn--ghost btn--sm" href={`https://ig.me/m/${o.buyerInstagram}`} target="_blank" rel="noopener">
-              인스타 DM 열기
+            <a className="btn btn--ghost btn--sm" data-agent-action="open-instagram-dm" href={`https://ig.me/m/${o.buyerInstagram}`} target="_blank" rel="noopener">
+              인스타 DM 열기 (@{o.buyerInstagram})
             </a>
           ) : null}
         </div>
@@ -203,8 +218,8 @@ function OrderCard({ o, busy, act, now }: { o: O; busy: string | null; act: (k: 
       <div className="order__actions">
         {pending ? (
           <>
-            <button type="button" className="btn btn--primary" data-agent-action="approve-order" aria-label={`주문 ${o.orderNumber} 입금 확인 및 발송 승인`} disabled={busy !== null} onClick={() => act(o.id, `${base}/approve`, `${o.orderNumber} 주문을 승인하고 5시간 다운로드 링크를 발급했습니다.`)}>
-              {busy === o.id ? "처리하고 있습니다" : "입금 확인 및 5시간 링크 발급"}
+            <button type="button" className="btn btn--primary" data-agent-action="approve-order" aria-label={`주문 ${o.orderNumber} 승인 및 5시간 링크 생성`} disabled={busy !== null} onClick={() => act(o.id, `${base}/approve`, `${o.orderNumber} 주문을 승인하고 5시간 다운로드 링크를 생성했습니다.`)}>
+              {busy === o.id ? "처리 중..." : "1. 승인 및 5시간 링크 생성"}
             </button>
             {confirmReject ? (
               <button type="button" className="btn btn--danger" data-agent-action="confirm-reject-order" aria-label={`주문 ${o.orderNumber} 입금 미확인 처리 확정`} disabled={busy !== null} onClick={() => act(o.id, `${base}/reject`, "입금 미확인으로 처리했습니다.")}>
@@ -217,14 +232,14 @@ function OrderCard({ o, busy, act, now }: { o: O; busy: string | null; act: (k: 
             )}
           </>
         ) : null}
-        {reissuable ? (
-          <button type="button" className={o.reissueRequestedAt ? "btn btn--primary" : "btn btn--ghost"} data-agent-action="reissue-link" aria-label={`주문 ${o.orderNumber} 다운로드 링크 재발급`} disabled={busy !== null} onClick={() => act(o.id, `${base}/reissue`, "새 5시간 링크를 발급했습니다.")}>
-            5시간 링크 재발급
+        {sending ? (
+          <button type="button" className="btn btn--primary" data-agent-action="mark-delivered" aria-label={`주문 ${o.orderNumber} 발송 완료 처리`} disabled={busy !== null} onClick={() => act(o.id, `${base}/mark-delivered`, "발송 완료로 처리했습니다.")}>
+            3. 발송 완료 처리
           </button>
         ) : null}
-        {sending ? (
-          <button type="button" className="btn btn--ghost" data-agent-action="mark-delivered" aria-label={`주문 ${o.orderNumber} 발송 완료 처리`} disabled={busy !== null} onClick={() => act(o.id, `${base}/mark-delivered`, "발송 완료로 처리했습니다.")}>
-            전달 완료로 표시
+        {reissuable ? (
+          <button type="button" className={o.reissueRequestedAt ? "btn btn--primary" : "btn btn--ghost"} data-agent-action="reissue-link" aria-label={`주문 ${o.orderNumber} 5시간 링크 재발급`} disabled={busy !== null} onClick={() => act(o.id, `${base}/reissue`, "새 5시간 링크를 발급했습니다.")}>
+            5시간 링크 재발급
           </button>
         ) : null}
       </div>

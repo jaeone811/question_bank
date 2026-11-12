@@ -21,10 +21,6 @@ export type StoreProduct = {
 
 type Pay = {
   bank: { name: string; account: string; holder: string };
-  kakaoPayLink: string;
-  tossLink: string;
-  kakaoQr: string | null;
-  tossQr: string | null;
   maxDownloads: number;
 };
 
@@ -166,11 +162,11 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
         <div className="wrap split">
           <div className="split__aside">
             <h2>구매 절차</h2>
-            <p>결제 대행사를 거치지 않고 계좌이체로 진행합니다. 입금 확인은 판매자가 직접 합니다.</p>
+            <p>결제 대행사를 거치지 않고 계좌이체로 진행합니다. 입금 확인 후 즉시 링크가 발송됩니다.</p>
           </div>
           <ol className="steps">
             <li><b>샘플 확인</b><span>자료마다 앞 2쪽을 그대로 보실 수 있습니다.</span></li>
-            <li><b>송금 후 주문서 제출</b><span>계좌이체, 카카오페이, 토스 중 편한 방법으로 보내시고 입금자명을 적어 주세요.</span></li>
+            <li><b>계좌 송금 후 주문서 제출</b><span>안내된 계좌로 입금하시고 통장에 표시되는 입금자명을 적어 주세요.</span></li>
             <li><b>입금 확인</b><span>주문 조회 화면에서 진행 상황을 바로 확인하실 수 있습니다.</span></li>
             <li><b>다운로드 링크 수령</b><span>승인 시각부터 5시간 동안, 최대 {pay.maxDownloads}회 받으실 수 있습니다.</span></li>
           </ol>
@@ -248,18 +244,11 @@ function SampleModal({ product, onClose, onBuy }: { product: StoreProduct; onClo
   );
 }
 
-type Method = "BANK" | "KAKAOPAY" | "TOSS";
 type Channel = "INSTAGRAM_DM" | "EMAIL" | "BOTH";
 
 function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; onClose: () => void }) {
   const ref = useOverlay(onClose);
   const router = useRouter();
-  const methods: { id: Method; label: string; ready: boolean }[] = [
-    { id: "BANK", label: "계좌이체", ready: !!pay.bank.account },
-    { id: "KAKAOPAY", label: "카카오페이", ready: !!pay.kakaoPayLink },
-    { id: "TOSS", label: "토스", ready: !!pay.tossLink },
-  ];
-  const [method, setMethod] = useState<Method>(methods.find((m) => m.ready)?.id ?? "BANK");
   const [channel, setChannel] = useState<Channel>("INSTAGRAM_DM");
   const [f, setF] = useState({ buyerName: "", depositorName: "", buyerPhone: "", buyerInstagram: "", buyerEmail: "" });
   const [depositorTouched, setDepositorTouched] = useState(false);
@@ -271,7 +260,7 @@ function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; 
 
   const set = (k: keyof typeof f, v: string) => {
     setF((s) => ({ ...s, [k]: v, ...(k === "buyerName" && !depositorTouched ? { depositorName: v } : {}) }));
-    setErrors((e) => ({ ...e, [k]: undefined })); // 고치기 시작하면 해당 오류 문구는 지움
+    setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
   const copyAccount = async () => {
@@ -287,7 +276,7 @@ function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-    const body = { productId: product.id, ...f, preferredChannel: channel, paymentMethod: method, agreeRefund: agree.refund, agreeCopyright: agree.copyright };
+    const body = { productId: product.id, ...f, preferredChannel: channel, paymentMethod: "BANK" as const, agreeRefund: agree.refund, agreeCopyright: agree.copyright };
     const v = validateOrder(body);
     if (!v.ok) {
       setErrors(v.errors);
@@ -322,8 +311,6 @@ function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; 
 
   const needInsta = channel !== "EMAIL";
   const needEmail = channel !== "INSTAGRAM_DM";
-  const link = method === "KAKAOPAY" ? pay.kakaoPayLink : pay.tossLink;
-  const qr = method === "KAKAOPAY" ? pay.kakaoQr : pay.tossQr;
 
   return (
     <div className="overlay overlay--drawer" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -338,46 +325,25 @@ function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; 
 
         <form className="drawer__body" onSubmit={submit} noValidate>
           <fieldset className="block">
-            <legend><span className="step-no">1</span>송금하기</legend>
+            <legend><span className="step-no">1</span>계좌이체 송금하기</legend>
             <div className="amount">
               <span>입금하실 금액</span>
               <b className="num">{won(product.price)}원</b>
             </div>
-            <div className="seg" role="radiogroup" aria-label="송금 방법">
-              {methods.map((m) => (
-                <button key={m.id} type="button" role="radio" aria-checked={method === m.id} className="seg__btn" onClick={() => setMethod(m.id)}>
-                  {m.label}
-                </button>
-              ))}
-            </div>
 
-            {method === "BANK" ? (
-              pay.bank.account ? (
-                <div className="paycard">
-                  <dl>
-                    <div><dt>은행</dt><dd>{pay.bank.name}</dd></div>
-                    <div><dt>계좌번호</dt><dd className="num paycard__acct">{pay.bank.account}</dd></div>
-                    <div><dt>예금주</dt><dd>{pay.bank.holder}</dd></div>
-                  </dl>
-                  <button type="button" className="btn btn--ghost btn--block" onClick={copyAccount} aria-live="polite">
-                    {copied ? "복사했습니다" : "계좌번호 복사"}
-                  </button>
-                </div>
-              ) : (
-                <p className="notice">계좌 정보가 아직 등록되지 않았습니다. 판매자에게 문의해 주세요.</p>
-              )
-            ) : link ? (
-              <div className="paycard paycard--qr">
-                {qr ? <img src={qr} alt={`${method === "KAKAOPAY" ? "카카오페이" : "토스"} 송금 QR 코드`} width={148} height={148} /> : null}
-                <div>
-                  <p>휴대전화 카메라로 QR 코드를 비추시거나, 휴대전화에서는 아래 버튼을 눌러 주세요. 금액 <b className="num">{won(product.price)}원</b>을 직접 입력해 보내시면 됩니다.</p>
-                  <a className="btn btn--ghost btn--block" href={link} target="_blank" rel="noopener">
-                    {method === "KAKAOPAY" ? "카카오페이로 송금하기" : "토스로 송금하기"}
-                  </a>
-                </div>
+            {pay.bank.account ? (
+              <div className="paycard">
+                <dl>
+                  <div><dt>은행</dt><dd>{pay.bank.name}</dd></div>
+                  <div><dt>계좌번호</dt><dd className="num paycard__acct">{pay.bank.account}</dd></div>
+                  <div><dt>예금주</dt><dd>{pay.bank.holder}</dd></div>
+                </dl>
+                <button type="button" className="btn btn--ghost btn--block" onClick={copyAccount} aria-live="polite">
+                  {copied ? "복사했습니다" : "계좌번호 복사"}
+                </button>
               </div>
             ) : (
-              <p className="notice">이 송금 방법은 아직 준비되지 않았습니다. 다른 방법을 선택해 주세요.</p>
+              <p className="notice">계좌 정보가 아직 등록되지 않았습니다. 판매자에게 문의해 주세요.</p>
             )}
           </fieldset>
 

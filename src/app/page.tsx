@@ -1,12 +1,8 @@
-import QRCode from "qrcode";
 import { Storefront, type StoreProduct } from "@/components/Storefront";
 import { config } from "@/lib/config";
 import { sellableProducts } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
-
-const qr = async (link: string) =>
-  link ? `data:image/svg+xml;utf8,${encodeURIComponent(await QRCode.toString(link, { type: "svg", margin: 1, color: { dark: "#141413", light: "#ffffff" } }))}` : null;
 
 export default async function Home() {
   const list = await sellableProducts();
@@ -27,10 +23,6 @@ export default async function Home() {
       products={products}
       pay={{
         bank: config.bank,
-        kakaoPayLink: config.kakaoPayLink,
-        tossLink: config.tossLink,
-        kakaoQr: await qr(config.kakaoPayLink),
-        tossQr: await qr(config.tossLink),
         maxDownloads: config.maxDownloads,
       }}
     />
