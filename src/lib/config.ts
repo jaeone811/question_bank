@@ -1,13 +1,20 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { randomBytes } from "node:crypto";
-import path from "node:path";
-import { dataDir } from "../db";
+import { createHash } from "node:crypto";
 
 const env = (k: string, d = "") => (process.env[k] ?? d).trim();
 
 export const config = {
   get siteUrl() {
-    return env("SITE_URL", "http://localhost:3000").replace(/\/+$/, "");
+    const explicit = env("SITE_URL") || env("NEXT_PUBLIC_SITE_URL");
+    if (explicit) return explicit.replace(/\/+$/, "");
+    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+    return "http://localhost:3000";
+  },
+  get supabase() {
+    return {
+      url: env("SUPABASE_URL") || env("NEXT_PUBLIC_SUPABASE_URL"),
+      serviceRoleKey: env("SUPABASE_SERVICE_ROLE_KEY"),
+    };
   },
   get adminPassword() {
     return env("ADMIN_PASSWORD");
@@ -27,11 +34,11 @@ export const config = {
   get gmail() {
     return { user: env("GMAIL_USER"), appPassword: env("GMAIL_APP_PASSWORD").replace(/\s+/g, "") };
   },
-  get telegram() {
-    return { token: env("TELEGRAM_BOT_TOKEN"), chatId: env("TELEGRAM_CHAT_ID") };
-  },
-  get discordWebhook() {
-    return env("DISCORD_WEBHOOK_URL");
+  get pickle() {
+    return {
+      webhookUrl: env("PICKLE_WEBHOOK_URL"),
+      apiKey: env("PICKLE_API_KEY"),
+    };
   },
   get maxDownloads() {
     return Math.max(1, Number(env("MAX_DOWNLOADS", "3")) || 3);
@@ -40,23 +47,12 @@ export const config = {
 
 export const LINK_TTL_MS = 5 * 60 * 60 * 1000; // 승인 시각 + 5시간 (18,000초)
 
-// 서명용 비밀키: 환경변수가 없으면 data/.secret 에 한 번 만들어 두고 계속 씀
+// 서명용 비밀키: APP_SECRET이 없으면 SUPABASE_SERVICE_ROLE_KEY + ADMIN_PASSWORD 조합에서 결정론적으로 파생 (서버리스 호환)
 let cached: string | undefined;
 export function appSecret(): string {
   if (cached) return cached;
   const fromEnv = env("APP_SECRET");
   if (fromEnv.length >= 32) return (cached = fromEnv);
-  const file = path.join(dataDir(), ".secret");
-  if (existsSync(file)) return (cached = readFileSync(file, "utf8").trim());
-  mkdirSync(dataDir(), { recursive: true });
-  const s = randomBytes(48).toString("base64url");
-  writeFileSync(file, s, { mode: 0o600 });
-  return (cached = s);
+  const seed = `${config.supabase.serviceRoleKey}:${config.adminPassword}:question-bank-v2`;
+  return (cached = createHash("sha256").update(seed).digest("base64url"));
 }
-
-export const paths = {
-  privateFiles: () => path.join(process.cwd(), "storage", "private", "questions"),
-  samples: () => path.join(process.cwd(), "storage", "samples"),
-  vault: () => path.join(process.cwd(), ".agent-vault"),
-  screenshots: () => path.join(process.cwd(), ".agent-vault", "screenshots"),
-};

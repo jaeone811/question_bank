@@ -1,12 +1,15 @@
 import { PDFDocument, degrees, rgb, type PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 let fontBytes: Buffer | undefined;
 function koreanFont() {
-  // 한글 워터마크용 (pdf-lib 기본 폰트는 한글을 못 씀)
-  fontBytes ??= readFileSync(path.join(process.cwd(), "node_modules/pretendard/dist/public/static/alternative/Pretendard-SemiBold.ttf"));
+  if (fontBytes) return fontBytes;
+  // 한글 워터마크용 (pdf-lib 기본 폰트는 한글을 못 씀, 서버리스 및 로컬 경로 모두 지원)
+  const vendorPath = path.join(process.cwd(), "public/vendor/Pretendard-SemiBold.ttf");
+  const nodeModulesPath = path.join(process.cwd(), "node_modules/pretendard/dist/public/static/alternative/Pretendard-SemiBold.ttf");
+  fontBytes = readFileSync(existsSync(vendorPath) ? vendorPath : nodeModulesPath);
   return fontBytes;
 }
 

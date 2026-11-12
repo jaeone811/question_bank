@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const v = validateOrder(body as Record<string, unknown>);
   if (!v.ok) return fail(422, "입력 내용을 확인해 주세요.", { errors: v.errors });
   try {
-    const { order } = createOrder(v.data);
+    const { order } = await createOrder(v.data);
     return NextResponse.json({ ok: true, data: { orderNumber: order.orderNumber, amount: order.totalAmount } }, { status: 201 });
   } catch (e) {
     if (e instanceof OrderError) return fail(e.status, e.message, { code: e.code });

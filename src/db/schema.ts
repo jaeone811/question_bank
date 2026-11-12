@@ -1,26 +1,3 @@
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
-
-// 시각은 전부 epoch 밀리초(integer)
-
-export const products = sqliteTable("products", {
-  id: text("id").primaryKey(),
-  title: text("title").notNull(),
-  subject: text("subject"),
-  grade: text("grade").notNull().default("고2"),
-  difficulty: text("difficulty"), // '기본' | '표준' | '심화' 등 자유 입력
-  questionCount: integer("question_count"),
-  pageCount: integer("page_count"), // 업로드한 PDF 에서 자동 계산
-  price: integer("price").notNull(),
-  description: text("description"),
-  samplePdfUrl: text("sample_pdf_url"), // storage/samples 안의 파일명 (공개)
-  originalFilePath: text("original_file_path"), // storage/private/questions 안의 파일명 (비공개)
-  originalFileName: text("original_file_name"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
-
 export const ORDER_STATUSES = [
   "PENDING_VERIFICATION",
   "NOTIFIED_USER",
@@ -39,102 +16,141 @@ export type PreferredChannel = (typeof CHANNELS)[number];
 export const PAYMENT_METHODS = ["BANK", "KAKAOPAY", "TOSS"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-export const orders = sqliteTable(
-  "orders",
-  {
-    id: text("id").primaryKey(),
-    orderNumber: text("order_number").notNull().unique(),
-    productId: text("product_id")
-      .notNull()
-      .references(() => products.id),
-    buyerName: text("buyer_name").notNull(),
-    depositorName: text("depositor_name").notNull(),
-    buyerEmail: text("buyer_email"),
-    buyerInstagram: text("buyer_instagram"),
-    buyerPhone: text("buyer_phone").notNull(),
-    preferredChannel: text("preferred_channel").$type<PreferredChannel>().notNull(),
-    paymentMethod: text("payment_method").$type<PaymentMethod>().notNull(),
-    totalAmount: integer("total_amount").notNull(),
-    status: text("status").$type<OrderStatus>().notNull().default("PENDING_VERIFICATION"),
-    agentSeenAt: integer("agent_seen_at"), // 에이전트가 주문서를 확인한 시각
-    reissueRequestedAt: integer("reissue_requested_at"),
-    adminMemo: text("admin_memo"),
-    createdAt: integer("created_at").notNull(),
-    approvedAt: integer("approved_at"),
-    deliveredAt: integer("delivered_at"),
-  },
-  (t) => [index("orders_status_idx").on(t.status, t.createdAt)],
-);
+export type TaskChannel = "INSTAGRAM" | "EMAIL";
 
-export const downloadTokens = sqliteTable(
-  "download_tokens",
-  {
-    id: text("id").primaryKey(),
-    orderId: text("order_id")
-      .notNull()
-      .references(() => orders.id),
-    productId: text("product_id")
-      .notNull()
-      .references(() => products.id),
-    tokenHash: text("token_hash").notNull().unique(),
-    expiresAt: integer("expires_at").notNull(), // 승인 시각 + 5시간
-    downloadCount: integer("download_count").notNull().default(0),
-    maxDownloads: integer("max_downloads").notNull().default(3),
-    lastDownloadedAt: integer("last_downloaded_at"),
-    clientIpLog: text("client_ip_log").notNull().default("[]"), // JSON [{ip, at}]
-    isRevoked: integer("is_revoked", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at").notNull(),
-  },
-  (t) => [index("download_tokens_order_idx").on(t.orderId)],
-);
+export type Product = {
+  id: string;
+  title: string;
+  subject: string | null;
+  grade: string;
+  difficulty: string | null;
+  questionCount: number | null;
+  pageCount: number | null;
+  price: number;
+  description: string | null;
+  samplePdfUrl: string | null;
+  originalFilePath: string | null;
+  originalFileName: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
 
-export const TASK_TYPES = ["SEND_RECEIPT_ACK", "SEND_DOWNLOAD_LINK"] as const;
-export type TaskType = (typeof TASK_TYPES)[number];
-export const TASK_CHANNELS = ["INSTAGRAM", "EMAIL"] as const;
-export type TaskChannel = (typeof TASK_CHANNELS)[number];
-export const TASK_STATUSES = ["QUEUED", "RUNNING", "AWAITING_HUMAN_AUTH", "COMPLETED", "FAILED", "SKIPPED"] as const;
-export type TaskStatus = (typeof TASK_STATUSES)[number];
+export type Order = {
+  id: string;
+  orderNumber: string;
+  productId: string;
+  buyerName: string;
+  depositorName: string;
+  buyerEmail: string | null;
+  buyerInstagram: string | null;
+  buyerPhone: string;
+  preferredChannel: PreferredChannel;
+  paymentMethod: PaymentMethod;
+  totalAmount: number;
+  status: OrderStatus;
+  reissueRequestedAt: number | null;
+  adminMemo: string | null;
+  downloadUrl: string | null;
+  emailSentAt: number | null;
+  emailError: string | null;
+  createdAt: number;
+  approvedAt: number | null;
+  deliveredAt: number | null;
+};
 
-export const agentTasks = sqliteTable(
-  "agent_tasks",
-  {
-    id: text("id").primaryKey(),
-    orderId: text("order_id")
-      .notNull()
-      .references(() => orders.id),
-    taskType: text("task_type").$type<TaskType>().notNull(),
-    targetChannel: text("target_channel").$type<TaskChannel>().notNull(),
-    status: text("status").$type<TaskStatus>().notNull().default("QUEUED"),
-    // JSON { downloadUrl?, expiresAt?, message? } : 발송에 필요한 값. 완료되면 링크는 지움
-    payload: text("payload").notNull().default("{}"),
-    attempts: integer("attempts").notNull().default(0),
-    screenshotPath: text("screenshot_path"),
-    errorMessage: text("error_message"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (t) => [index("agent_tasks_status_idx").on(t.status, t.createdAt)],
-);
+export type DownloadToken = {
+  id: string;
+  orderId: string;
+  productId: string;
+  tokenHash: string;
+  expiresAt: number;
+  downloadCount: number;
+  maxDownloads: number;
+  lastDownloadedAt: number | null;
+  clientIpLog: string;
+  isRevoked: boolean;
+  createdAt: number;
+};
 
-export const agentLogs = sqliteTable("agent_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  taskId: text("task_id"),
-  orderId: text("order_id"),
-  level: text("level").$type<"info" | "warn" | "error">().notNull().default("info"),
-  message: text("message").notNull(),
-  screenshotPath: text("screenshot_path"),
-  createdAt: integer("created_at").notNull(),
-});
+export type OrderLog = {
+  id: number;
+  orderId: string | null;
+  level: "info" | "warn" | "error";
+  message: string;
+  createdAt: number;
+};
 
-// 워커 heartbeat, 로그인 상태 등 단순 키-값
-export const agentState = sqliteTable("agent_state", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+// Supabase row (snake_case) -> App type (camelCase)
+export function mapProduct(r: Record<string, unknown>): Product {
+  return {
+    id: String(r.id),
+    title: String(r.title),
+    subject: (r.subject as string | null) ?? null,
+    grade: String(r.grade ?? "고2"),
+    difficulty: (r.difficulty as string | null) ?? null,
+    questionCount: r.question_count != null ? Number(r.question_count) : null,
+    pageCount: r.page_count != null ? Number(r.page_count) : null,
+    price: Number(r.price),
+    description: (r.description as string | null) ?? null,
+    samplePdfUrl: (r.sample_pdf_url as string | null) ?? null,
+    originalFilePath: (r.original_file_path as string | null) ?? null,
+    originalFileName: (r.original_file_name as string | null) ?? null,
+    sortOrder: Number(r.sort_order ?? 0),
+    isActive: Boolean(r.is_active ?? true),
+    createdAt: Number(r.created_at ?? Date.now()),
+    updatedAt: Number(r.updated_at ?? Date.now()),
+  };
+}
 
-export type Product = typeof products.$inferSelect;
-export type Order = typeof orders.$inferSelect;
-export type DownloadToken = typeof downloadTokens.$inferSelect;
-export type AgentTask = typeof agentTasks.$inferSelect;
-export type AgentLog = typeof agentLogs.$inferSelect;
+export function mapOrder(r: Record<string, unknown>): Order {
+  return {
+    id: String(r.id),
+    orderNumber: String(r.order_number),
+    productId: String(r.product_id),
+    buyerName: String(r.buyer_name),
+    depositorName: String(r.depositor_name),
+    buyerEmail: (r.buyer_email as string | null) ?? null,
+    buyerInstagram: (r.buyer_instagram as string | null) ?? null,
+    buyerPhone: String(r.buyer_phone),
+    preferredChannel: r.preferred_channel as PreferredChannel,
+    paymentMethod: r.payment_method as PaymentMethod,
+    totalAmount: Number(r.total_amount),
+    status: r.status as OrderStatus,
+    reissueRequestedAt: r.reissue_requested_at != null ? Number(r.reissue_requested_at) : null,
+    adminMemo: (r.admin_memo as string | null) ?? null,
+    downloadUrl: (r.download_url as string | null) ?? null,
+    emailSentAt: r.email_sent_at != null ? Number(r.email_sent_at) : null,
+    emailError: (r.email_error as string | null) ?? null,
+    createdAt: Number(r.created_at),
+    approvedAt: r.approved_at != null ? Number(r.approved_at) : null,
+    deliveredAt: r.delivered_at != null ? Number(r.delivered_at) : null,
+  };
+}
+
+export function mapDownloadToken(r: Record<string, unknown>): DownloadToken {
+  return {
+    id: String(r.id),
+    orderId: String(r.order_id),
+    productId: String(r.product_id),
+    tokenHash: String(r.token_hash),
+    expiresAt: Number(r.expires_at),
+    downloadCount: Number(r.download_count ?? 0),
+    maxDownloads: Number(r.max_downloads ?? 3),
+    lastDownloadedAt: r.last_downloaded_at != null ? Number(r.last_downloaded_at) : null,
+    clientIpLog: String(r.client_ip_log ?? "[]"),
+    isRevoked: Boolean(r.is_revoked ?? false),
+    createdAt: Number(r.created_at),
+  };
+}
+
+export function mapOrderLog(r: Record<string, unknown>): OrderLog {
+  return {
+    id: Number(r.id),
+    orderId: (r.order_id as string | null) ?? null,
+    level: (r.level as "info" | "warn" | "error") ?? "info",
+    message: String(r.message),
+    createdAt: Number(r.created_at),
+  };
+}

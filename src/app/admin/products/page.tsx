@@ -12,7 +12,7 @@ export default async function Page() {
   return (
     <section className="section section--page section--wide">
       <div className="wrap">
-        <ProductManager initial={allProducts()} />
+        <ProductManager initial={await allProducts()} />
       </div>
     </section>
   );

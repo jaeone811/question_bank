@@ -1,11 +1,22 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
-import { getDb, schema } from "../db";
-import type { Order, OrderStatus, Product, TaskChannel, TaskType } from "../db/schema";
+import {
+  mapDownloadToken,
+  mapOrder,
+  mapOrderLog,
+  mapProduct,
+  type Order,
+  type OrderLog,
+  type OrderStatus,
+  type Product,
+  type TaskChannel,
+} from "@/db/schema";
+import { config } from "./config";
+import { isEmailConfigured, notifyPickleWebhook, sendEmail } from "./email";
+import { productLabel } from "./format";
+import { ackMessage, linkMessage } from "./messages";
+import { getSupabase } from "./supabase";
 import { activeTokenFor, issueDownloadToken } from "./tokens";
 import type { OrderInput } from "./validation";
-
-const { orders, products, agentTasks, agentLogs, downloadTokens } = schema;
 
 export class OrderError extends Error {
   constructor(
@@ -19,7 +30,12 @@ export class OrderError extends Error {
 
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // 헷갈리는 I, L, O, U 제외
 function newOrderNumber(now: number) {
-  const d = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "2-digit", month: "2-digit", day: "2-digit" })
+  const d = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+  })
     .format(new Date(now))
     .replace(/-/g, "");
   const rand = Array.from(randomBytes(8), (b) => ALPHABET[b % 32]).join("");
@@ -33,167 +49,302 @@ export function channelsOf(o: Pick<Order, "preferredChannel" | "buyerEmail" | "b
   return out;
 }
 
-export function logAgent(message: string, opts: { orderId?: string; taskId?: string; level?: "info" | "warn" | "error"; screenshotPath?: string } = {}) {
-  getDb()
-    .insert(agentLogs)
-    .values({ message, orderId: opts.orderId, taskId: opts.taskId, level: opts.level ?? "info", screenshotPath: opts.screenshotPath, createdAt: Date.now() })
-    .run();
+export async function logOrder(
+  message: string,
+  opts: { orderId?: string; level?: "info" | "warn" | "error" } = {},
+): Promise<void> {
+  try {
+    await getSupabase().from("order_logs").insert({
+      order_id: opts.orderId ?? null,
+      level: opts.level ?? "info",
+      message,
+      created_at: Date.now(),
+    });
+  } catch (e) {
+    console.error("[order_logs] 기록 실패:", e);
+  }
 }
 
-function enqueue(orderId: string, taskType: TaskType, channel: TaskChannel, payload: object = {}) {
+export async function sellableProducts(): Promise<Product[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("products")
+    .select("*")
+    .eq("is_active", true)
+    .not("original_file_path", "is", null)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("판매 상품 조회 실패:", error.message);
+    return [];
+  }
+  return (data ?? []).map(mapProduct);
+}
+
+// 주문 접수: 금액은 서버가 상품 가격으로 계산. 이메일 접수 안내 및 피클 AI 웹훅 호출
+export async function createOrder(input: OrderInput): Promise<{ order: Order; product: Product }> {
+  const sb = getSupabase();
+  const { data: prodRow } = await sb.from("products").select("*").eq("id", input.productId).maybeSingle();
+  if (!prodRow) throw new OrderError("INVALID_PRODUCT", "지금은 구매할 수 없는 자료입니다.");
+  const product = mapProduct(prodRow);
+  if (!product.isActive || !product.originalFilePath) {
+    throw new OrderError("INVALID_PRODUCT", "지금은 구매할 수 없는 자료입니다.");
+  }
+
   const now = Date.now();
-  getDb()
-    .insert(agentTasks)
-    .values({ id: randomUUID(), orderId, taskType, targetChannel: channel, payload: JSON.stringify(payload), createdAt: now, updatedAt: now })
-    .run();
-}
+  const id = randomUUID();
+  const orderNumber = newOrderNumber(now);
+  let status: OrderStatus = "PENDING_VERIFICATION";
 
-export function sellableProducts(): Product[] {
-  return getDb()
-    .select()
-    .from(products)
-    .where(and(eq(products.isActive, true), isNotNull(products.originalFilePath)))
-    .orderBy(products.sortOrder, products.createdAt)
-    .all();
-}
+  const { data: inserted, error } = await sb
+    .from("orders")
+    .insert({
+      id,
+      order_number: orderNumber,
+      product_id: product.id,
+      buyer_name: input.buyerName,
+      depositor_name: input.depositorName,
+      buyer_email: input.buyerEmail,
+      buyer_instagram: input.buyerInstagram,
+      buyer_phone: input.buyerPhone,
+      preferred_channel: input.preferredChannel,
+      payment_method: input.paymentMethod,
+      total_amount: product.price,
+      status,
+      created_at: now,
+    })
+    .select("*")
+    .single();
 
-// 주문 접수: 금액은 서버가 상품 가격으로 계산. 접수 알림 작업을 큐에 넣음
-export function createOrder(input: OrderInput) {
-  const db = getDb();
-  return db.transaction(() => {
-    const product = db.select().from(products).where(eq(products.id, input.productId)).get();
-    if (!product || !product.isActive || !product.originalFilePath) throw new OrderError("INVALID_PRODUCT", "지금은 구매할 수 없는 자료입니다.");
-    const now = Date.now();
-    const order = {
-      id: randomUUID(),
-      orderNumber: newOrderNumber(now),
-      productId: product.id,
-      buyerName: input.buyerName,
-      depositorName: input.depositorName,
-      buyerEmail: input.buyerEmail,
-      buyerInstagram: input.buyerInstagram,
-      buyerPhone: input.buyerPhone,
-      preferredChannel: input.preferredChannel,
-      paymentMethod: input.paymentMethod,
-      totalAmount: product.price,
-      status: "PENDING_VERIFICATION" as OrderStatus,
-      createdAt: now,
-    };
-    db.insert(orders).values(order).run();
-    for (const ch of channelsOf(order)) enqueue(order.id, "SEND_RECEIPT_ACK", ch);
-    return { order, product };
+  if (error || !inserted) throw new Error(`주문 생성 실패: ${error?.message}`);
+  const order = mapOrder(inserted);
+
+  await logOrder(`새 주문 접수: ${order.orderNumber} (${order.depositorName}, ${productLabel(product)})`, {
+    orderId: order.id,
   });
+
+  const channels = channelsOf(order);
+  const ack = ackMessage(order.buyerName, product);
+
+  // 이메일 접수 알림 (설정된 경우 즉시 발송)
+  if (channels.includes("EMAIL") && order.buyerEmail && isEmailConfigured()) {
+    try {
+      await sendEmail(order.buyerEmail, `[기말고사 문제은행] 주문이 접수되었습니다 (${order.orderNumber})`, ack);
+      status = "NOTIFIED_USER";
+      await sb.from("orders").update({ status }).eq("id", order.id);
+      order.status = status;
+    } catch (e) {
+      console.error("접수 안내 이메일 발송 실패:", e);
+    }
+  }
+
+  // 피클 AI 웹훅 알림 (설정된 경우)
+  if (channels.includes("INSTAGRAM")) {
+    const ok = await notifyPickleWebhook("order.created", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      buyerName: order.buyerName,
+      depositorName: order.depositorName,
+      buyerInstagram: order.buyerInstagram,
+      buyerPhone: order.buyerPhone,
+      productTitle: productLabel(product),
+      amount: order.totalAmount,
+      message: ack,
+    });
+    if (ok && status === "PENDING_VERIFICATION") {
+      status = "NOTIFIED_USER";
+      await sb.from("orders").update({ status }).eq("id", order.id);
+      order.status = status;
+    }
+  }
+
+  return { order, product };
 }
 
 const APPROVABLE: OrderStatus[] = ["PENDING_VERIFICATION", "NOTIFIED_USER"];
 const REISSUABLE: OrderStatus[] = ["APPROVED", "DISPATCHING", "DELIVERED", "DISPATCH_FAILED", "EXPIRED"];
 
-function dispatch(order: Order, approvedAt: number) {
-  const db = getDb();
-  const { url, expiresAt } = issueDownloadToken(order.id, order.productId, approvedAt);
-  // 아직 안 나간 작업은 건너뜀 (접수 알림이 링크보다 늦게 가는 일 방지)
-  db.update(agentTasks)
-    .set({ status: "SKIPPED", errorMessage: "새 발송 작업으로 대체", updatedAt: Date.now() })
-    .where(and(eq(agentTasks.orderId, order.id), inArray(agentTasks.status, ["QUEUED", "AWAITING_HUMAN_AUTH"])))
-    .run();
-  for (const ch of channelsOf(order)) enqueue(order.id, "SEND_DOWNLOAD_LINK", ch, { downloadUrl: url, expiresAt });
-  return { url, expiresAt };
+async function dispatchOrderLink(order: Order, product: Product, approvedAt: number, isReissue = false) {
+  const sb = getSupabase();
+  const { url, expiresAt } = await issueDownloadToken(order.id, order.productId, approvedAt);
+  const message = linkMessage(order.buyerName, product, url, expiresAt, config.maxDownloads);
+  const channels = channelsOf(order);
+
+  let emailSentAt: number | null = order.emailSentAt;
+  let emailError: string | null = null;
+  let emailDelivered = false;
+  let igDelivered = false;
+
+  if (channels.includes("EMAIL") && order.buyerEmail) {
+    if (isEmailConfigured()) {
+      try {
+        await sendEmail(
+          order.buyerEmail,
+          `[기말고사 문제은행] ${productLabel(product)} 다운로드 링크 안내 (${order.orderNumber})`,
+          message,
+        );
+        emailSentAt = Date.now();
+        emailDelivered = true;
+        await logOrder(`이메일 링크 발송 완료: ${order.orderNumber} → ${order.buyerEmail}`, { orderId: order.id });
+      } catch (e) {
+        emailError = e instanceof Error ? e.message : "이메일 발송 오류";
+        await logOrder(`이메일 발송 실패: ${order.orderNumber} (${emailError})`, { orderId: order.id, level: "error" });
+      }
+    } else {
+      emailError = "GMAIL_USER / GMAIL_APP_PASSWORD 미설정 (관리자 화면에서 링크 복사 가능)";
+    }
+  }
+
+  if (channels.includes("INSTAGRAM") && order.buyerInstagram) {
+    igDelivered = await notifyPickleWebhook(isReissue ? "order.reissued" : "order.approved", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      buyerName: order.buyerName,
+      buyerInstagram: order.buyerInstagram,
+      buyerPhone: order.buyerPhone,
+      productTitle: productLabel(product),
+      downloadUrl: url,
+      expiresAt,
+      maxDownloads: config.maxDownloads,
+      message,
+    });
+    if (igDelivered) {
+      await logOrder(`피클 AI 웹훅으로 인스타 발송 요청 전달: ${order.orderNumber} (@${order.buyerInstagram})`, {
+        orderId: order.id,
+      });
+    }
+  }
+
+  const allDone =
+    (channels.includes("EMAIL") ? emailDelivered : true) &&
+    (channels.includes("INSTAGRAM") ? igDelivered : true);
+
+  const nextStatus: OrderStatus = allDone ? "DELIVERED" : "APPROVED";
+  const deliveredAt = allDone ? Date.now() : null;
+
+  await sb
+    .from("orders")
+    .update({
+      status: nextStatus,
+      approved_at: approvedAt,
+      delivered_at: deliveredAt,
+      reissue_requested_at: null,
+      download_url: url,
+      email_sent_at: emailSentAt,
+      email_error: emailError,
+    })
+    .eq("id", order.id);
+
+  return { url, expiresAt, message, status: nextStatus };
 }
 
-// 관리자 승인: 승인 시각 + 5시간짜리 링크 발급 → 발송 작업을 큐에 넣음
-export function approveOrder(orderId: string) {
-  const db = getDb();
-  return db.transaction(() => {
-    const order = db.select().from(orders).where(eq(orders.id, orderId)).get();
-    if (!order) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
-    if (!APPROVABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "이미 처리된 주문입니다.", 409);
-    const approvedAt = Date.now();
-    db.update(orders).set({ status: "APPROVED", approvedAt, deliveredAt: null }).where(eq(orders.id, orderId)).run();
-    const link = dispatch(order, approvedAt);
-    logAgent(`관리자 승인: ${order.orderNumber} 링크 발급, 발송 대기`, { orderId });
-    return { orderNumber: order.orderNumber, approvedAt, ...link };
-  });
-}
-
-// 재발급: 이전 링크를 폐기하고 지금부터 5시간짜리 링크를 다시 보냄
-export function reissueOrder(orderId: string) {
-  const db = getDb();
-  return db.transaction(() => {
-    const order = db.select().from(orders).where(eq(orders.id, orderId)).get();
-    if (!order) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
-    if (!REISSUABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "승인된 주문만 재발급할 수 있습니다.", 409);
-    const now = Date.now();
-    db.update(orders).set({ status: "APPROVED", reissueRequestedAt: null, deliveredAt: null }).where(eq(orders.id, orderId)).run();
-    const link = dispatch(order, now);
-    logAgent(`링크 재발급: ${order.orderNumber}`, { orderId });
-    return { orderNumber: order.orderNumber, ...link };
-  });
-}
-
-export function rejectOrder(orderId: string, memo?: string) {
-  const db = getDb();
-  const order = db.select().from(orders).where(eq(orders.id, orderId)).get();
-  if (!order) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
+// 관리자 승인: 승인 시각 + 5시간짜리 링크 발급 → 이메일 자동 발송 및 피클 AI / 인스타 DM용 링크 생성
+export async function approveOrder(orderId: string) {
+  const sb = getSupabase();
+  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
+  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
+  const order = mapOrder(ordRow);
   if (!APPROVABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "이미 처리된 주문입니다.", 409);
-  db.update(orders).set({ status: "REJECTED", adminMemo: memo?.slice(0, 200) || null }).where(eq(orders.id, orderId)).run();
-  db.update(agentTasks)
-    .set({ status: "SKIPPED", errorMessage: "입금 미확인 처리", updatedAt: Date.now() })
-    .where(and(eq(agentTasks.orderId, orderId), inArray(agentTasks.status, ["QUEUED", "AWAITING_HUMAN_AUTH"])))
-    .run();
-  logAgent(`입금 미확인 처리: ${order.orderNumber}`, { orderId, level: "warn" });
+
+  const { data: prodRow } = await sb.from("products").select("*").eq("id", order.productId).maybeSingle();
+  if (!prodRow) throw new OrderError("NOT_FOUND", "상품 정보를 찾을 수 없습니다.", 404);
+  const product = mapProduct(prodRow);
+
+  const approvedAt = Date.now();
+  const link = await dispatchOrderLink(order, product, approvedAt, false);
+  await logOrder(`관리자 승인 및 5시간 링크 발급: ${order.orderNumber}`, { orderId });
+  return { orderNumber: order.orderNumber, approvedAt, ...link };
 }
 
-// 자동 발송이 막혀 관리자가 직접 보낸 경우
-export function markDeliveredManually(orderId: string) {
-  const db = getDb();
-  const order = db.select().from(orders).where(eq(orders.id, orderId)).get();
-  if (!order) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
-  if (!["APPROVED", "DISPATCHING", "DISPATCH_FAILED"].includes(order.status)) throw new OrderError("BAD_STATUS", "발송 대기 중인 주문이 아닙니다.", 409);
-  db.update(orders).set({ status: "DELIVERED", deliveredAt: Date.now() }).where(eq(orders.id, orderId)).run();
-  db.update(agentTasks)
-    .set({ status: "SKIPPED", errorMessage: "관리자가 직접 발송", updatedAt: Date.now() })
-    .where(and(eq(agentTasks.orderId, orderId), inArray(agentTasks.status, ["QUEUED", "AWAITING_HUMAN_AUTH"])))
-    .run();
-  logAgent(`관리자가 직접 발송 완료 처리: ${order.orderNumber}`, { orderId });
+// 재발급: 이전 링크를 폐기하고 지금부터 5시간짜리 링크를 다시 발급
+export async function reissueOrder(orderId: string) {
+  const sb = getSupabase();
+  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
+  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
+  const order = mapOrder(ordRow);
+  if (!REISSUABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "승인된 주문만 재발급할 수 있습니다.", 409);
+
+  const { data: prodRow } = await sb.from("products").select("*").eq("id", order.productId).maybeSingle();
+  if (!prodRow) throw new OrderError("NOT_FOUND", "상품 정보를 찾을 수 없습니다.", 404);
+  const product = mapProduct(prodRow);
+
+  const now = Date.now();
+  const link = await dispatchOrderLink(order, product, order.approvedAt ?? now, true);
+  await logOrder(`다운로드 링크 재발급: ${order.orderNumber}`, { orderId });
+  return { orderNumber: order.orderNumber, ...link };
 }
 
-export function retryTask(taskId: string) {
-  const db = getDb();
-  const task = db.select().from(agentTasks).where(eq(agentTasks.id, taskId)).get();
-  if (!task) throw new OrderError("NOT_FOUND", "작업을 찾을 수 없습니다.", 404);
-  if (task.status !== "FAILED") throw new OrderError("BAD_STATUS", "실패한 작업만 다시 시도할 수 있습니다.", 409);
-  db.update(agentTasks).set({ status: "QUEUED", errorMessage: null, updatedAt: Date.now() }).where(eq(agentTasks.id, taskId)).run();
+export async function rejectOrder(orderId: string, memo?: string) {
+  const sb = getSupabase();
+  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
+  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
+  const order = mapOrder(ordRow);
+  if (!APPROVABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "이미 처리된 주문입니다.", 409);
+
+  await sb
+    .from("orders")
+    .update({ status: "REJECTED", admin_memo: memo?.slice(0, 200) || null })
+    .eq("id", orderId);
+  await logOrder(`입금 미확인 처리: ${order.orderNumber}`, { orderId, level: "warn" });
+}
+
+// 피클 AI 또는 관리자가 DM/메시지로 링크 전달을 마친 경우 완료 처리
+export async function markDeliveredManually(orderId: string) {
+  const sb = getSupabase();
+  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
+  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
+  const order = mapOrder(ordRow);
+  if (!["APPROVED", "DISPATCHING", "DISPATCH_FAILED"].includes(order.status)) {
+    throw new OrderError("BAD_STATUS", "발송 대기 중인 주문이 아닙니다.", 409);
+  }
+  await sb.from("orders").update({ status: "DELIVERED", delivered_at: Date.now() }).eq("id", orderId);
+  await logOrder(`링크 전달 완료 처리: ${order.orderNumber}`, { orderId });
 }
 
 // 구매자의 재발급 요청 (주문번호 + 연락처 일치 확인)
-export function requestReissue(orderNumber: string, contact: string) {
-  const db = getDb();
-  const order = db.select().from(orders).where(eq(orders.orderNumber, orderNumber.trim().toUpperCase())).get();
+export async function requestReissue(orderNumber: string, contact: string) {
+  const sb = getSupabase();
+  const { data: ordRow } = await sb
+    .from("orders")
+    .select("*")
+    .eq("order_number", orderNumber.trim().toUpperCase())
+    .maybeSingle();
+  if (!ordRow) throw new OrderError("NOT_FOUND", "주문번호와 연락처가 일치하는 주문을 찾지 못했습니다.", 404);
+  const order = mapOrder(ordRow);
+
   const c = contact.trim().toLowerCase().replace(/^@+/, "");
   const phone = c.replace(/[\s-]/g, "");
-  const match = order && (order.buyerEmail === c || order.buyerInstagram === c || order.buyerPhone === phone);
-  if (!order || !match) throw new OrderError("NOT_FOUND", "주문번호와 연락처가 일치하는 주문을 찾지 못했습니다.", 404);
+  const match = order.buyerEmail === c || order.buyerInstagram === c || order.buyerPhone === phone;
+  if (!match) throw new OrderError("NOT_FOUND", "주문번호와 연락처가 일치하는 주문을 찾지 못했습니다.", 404);
   if (!REISSUABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "아직 입금 확인이 끝나지 않은 주문입니다.", 409);
   if (order.reissueRequestedAt) return { orderNumber: order.orderNumber, already: true };
-  db.update(orders).set({ reissueRequestedAt: Date.now() }).where(eq(orders.id, order.id)).run();
-  logAgent(`구매자 재발급 요청: ${order.orderNumber}`, { orderId: order.id, level: "warn" });
+
+  await sb.from("orders").update({ reissue_requested_at: Date.now() }).eq("id", order.id);
+  await logOrder(`구매자 재발급 요청: ${order.orderNumber}`, { orderId: order.id, level: "warn" });
   return { orderNumber: order.orderNumber, already: false };
 }
 
 // 구매자 상태 페이지용 (개인정보는 내보내지 않음)
-export function publicOrderStatus(orderNumber: string) {
-  const db = getDb();
-  const row = db
-    .select({ order: orders, product: products })
-    .from(orders)
-    .innerJoin(products, eq(orders.productId, products.id))
-    .where(eq(orders.orderNumber, orderNumber.toUpperCase()))
-    .get();
-  if (!row) return null;
-  const { order, product } = row;
-  const token = activeTokenFor(order.id);
+export async function publicOrderStatus(orderNumber: string) {
+  const sb = getSupabase();
+  const { data: ordRow } = await sb
+    .from("orders")
+    .select("*")
+    .eq("order_number", orderNumber.toUpperCase())
+    .maybeSingle();
+  if (!ordRow) return null;
+  const order = mapOrder(ordRow);
+
+  const { data: prodRow } = await sb.from("products").select("*").eq("id", order.productId).maybeSingle();
+  if (!prodRow) return null;
+  const product = mapProduct(prodRow);
+
+  const token = await activeTokenFor(order.id);
   let status = order.status;
-  if (status === "DELIVERED" && token && Date.now() >= token.expiresAt) status = "EXPIRED";
+  if ((status === "DELIVERED" || status === "APPROVED") && token && Date.now() >= token.expiresAt) {
+    status = "EXPIRED";
+  }
+
   return {
     orderNumber: order.orderNumber,
     status,
@@ -202,7 +353,7 @@ export function publicOrderStatus(orderNumber: string) {
     paymentMethod: order.paymentMethod,
     depositorName: order.depositorName,
     channels: channelsOf(order),
-    agentSeen: !!order.agentSeenAt,
+    agentSeen: true,
     createdAt: order.createdAt,
     approvedAt: order.approvedAt,
     deliveredAt: order.deliveredAt,
@@ -212,39 +363,86 @@ export function publicOrderStatus(orderNumber: string) {
   };
 }
 
-export function adminOverview() {
-  const db = getDb();
-  const rows = db
-    .select({ order: orders, product: products })
-    .from(orders)
-    .innerJoin(products, eq(orders.productId, products.id))
-    .orderBy(desc(orders.createdAt))
-    .limit(200)
-    .all();
-  const ids = rows.map((r) => r.order.id);
-  const tasks = ids.length ? db.select().from(agentTasks).where(inArray(agentTasks.orderId, ids)).orderBy(agentTasks.createdAt).all() : [];
-  const tokens = ids.length ? db.select().from(downloadTokens).where(and(inArray(downloadTokens.orderId, ids), eq(downloadTokens.isRevoked, false))).all() : [];
-  const logs = db.select().from(agentLogs).orderBy(desc(agentLogs.id)).limit(60).all();
-  const state = Object.fromEntries(db.select().from(schema.agentState).all().map((s) => [s.key, { value: s.value, updatedAt: s.updatedAt }]));
+export async function adminOverview() {
+  const sb = getSupabase();
+  const [ordersRes, productsRes, tokensRes, logsRes] = await Promise.all([
+    sb.from("orders").select("*").order("created_at", { ascending: false }).limit(200),
+    sb.from("products").select("*"),
+    sb.from("download_tokens").select("*").eq("is_revoked", false),
+    sb.from("order_logs").select("*").order("id", { ascending: false }).limit(60),
+  ]);
+
+  const orderList = (ordersRes.data ?? []).map(mapOrder);
+  const productMap = new Map<string, Product>((productsRes.data ?? []).map((r) => {
+    const p = mapProduct(r);
+    return [p.id, p];
+  }));
+  const activeTokens = (tokensRes.data ?? []).map(mapDownloadToken);
+  const logs: OrderLog[] = (logsRes.data ?? []).map(mapOrderLog);
+
   return {
     now: Date.now(),
-    orders: rows.map(({ order, product }) => {
-      const token = tokens.find((t) => t.orderId === order.id);
+    orders: orderList.map((order) => {
+      const product = productMap.get(order.productId);
+      const label = product ? [product.subject, product.title].filter(Boolean).join(" · ") : order.productId;
+      const token = activeTokens.find((t) => t.orderId === order.id);
+      const dmMessage =
+        order.downloadUrl && token && product
+          ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt, token.maxDownloads)
+          : null;
       return {
         ...order,
-        productLabel: [product.subject, product.title].filter(Boolean).join(" · "),
-        tasks: tasks
-          .filter((t) => t.orderId === order.id)
-          .map((t) => {
-            const p = JSON.parse(t.payload) as { message?: string };
-            return { id: t.id, taskType: t.taskType, targetChannel: t.targetChannel, status: t.status, attempts: t.attempts, screenshotPath: t.screenshotPath, errorMessage: t.errorMessage, updatedAt: t.updatedAt, message: p.message ?? null };
-          }),
-        token: token ? { expiresAt: token.expiresAt, downloadCount: token.downloadCount, maxDownloads: token.maxDownloads } : null,
+        productLabel: label,
+        dmMessage,
+        token: token
+          ? { expiresAt: token.expiresAt, downloadCount: token.downloadCount, maxDownloads: token.maxDownloads }
+          : null,
       };
     }),
     logs,
-    state,
   };
 }
-export type AdminOverview = ReturnType<typeof adminOverview>;
-export type PublicOrderStatus = NonNullable<ReturnType<typeof publicOrderStatus>>;
+
+// 피클 AI 연동용 주문/링크 조회 (주문번호, 인스타 아이디, 전화번호 중 하나로 최신 주문 조회)
+export async function findOrderForPickle(query: { orderNumber?: string; instagram?: string; phone?: string }) {
+  const sb = getSupabase();
+  let q = sb.from("orders").select("*").order("created_at", { ascending: false }).limit(1);
+  if (query.orderNumber) {
+    q = q.eq("order_number", query.orderNumber.trim().toUpperCase());
+  } else if (query.instagram) {
+    q = q.eq("buyer_instagram", query.instagram.trim().toLowerCase().replace(/^@+/, ""));
+  } else if (query.phone) {
+    q = q.eq("buyer_phone", query.phone.trim().replace(/[\s-]/g, ""));
+  } else {
+    return null;
+  }
+
+  const { data: ordRow } = await q.maybeSingle();
+  if (!ordRow) return null;
+  const order = mapOrder(ordRow);
+
+  const { data: prodRow } = await sb.from("products").select("*").eq("id", order.productId).maybeSingle();
+  const product = prodRow ? mapProduct(prodRow) : null;
+  const token = await activeTokenFor(order.id);
+  const message =
+    order.downloadUrl && token && product
+      ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt, token.maxDownloads)
+      : null;
+
+  return {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    buyerName: order.buyerName,
+    depositorName: order.depositorName,
+    buyerInstagram: order.buyerInstagram,
+    productTitle: product ? productLabel(product) : order.productId,
+    amount: order.totalAmount,
+    downloadUrl: order.downloadUrl,
+    expiresAt: token?.expiresAt ?? null,
+    downloadsLeft: token ? Math.max(0, token.maxDownloads - token.downloadCount) : null,
+    message,
+  };
+}
+
+export type AdminOverview = Awaited<ReturnType<typeof adminOverview>>;
+export type PublicOrderStatus = NonNullable<Awaited<ReturnType<typeof publicOrderStatus>>>;

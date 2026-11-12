@@ -9,7 +9,8 @@ const qr = async (link: string) =>
   link ? `data:image/svg+xml;utf8,${encodeURIComponent(await QRCode.toString(link, { type: "svg", margin: 1, color: { dark: "#141413", light: "#ffffff" } }))}` : null;
 
 export default async function Home() {
-  const products: StoreProduct[] = sellableProducts().map((p) => ({
+  const list = await sellableProducts();
+  const products: StoreProduct[] = list.map((p) => ({
     id: p.id,
     title: p.title,
     subject: p.subject,

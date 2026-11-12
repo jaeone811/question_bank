@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { orderNumber?: string; contact?: string };
   if (!body.orderNumber || !body.contact) return fail(422, "주문번호와 연락처를 모두 입력해 주세요.");
   try {
-    return NextResponse.json({ ok: true, data: requestReissue(body.orderNumber, body.contact) });
+    return NextResponse.json({ ok: true, data: await requestReissue(body.orderNumber, body.contact) });
   } catch (e) {
     if (e instanceof OrderError) return fail(e.status, e.message, { code: e.code });
     console.error(e);
