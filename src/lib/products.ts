@@ -67,11 +67,14 @@ async function storeOriginal(id: string, file: File) {
   if (ext === ".pdf") {
     try {
       pageCount = await countPages(bytes);
+    } catch (e) {
+      console.warn("PDF 쪽수 계산 생략:", e);
+    }
+    try {
       const sampleBytes = await makeSamplePdf(bytes);
       autoSample = await saveSample(id, sampleBytes);
     } catch (e) {
-      console.error("PDF 처리 오류:", e);
-      throw new OrderError("BAD_FILE", "PDF 파일을 읽거나 샘플을 생성하지 못했습니다. 파일이 손상되지 않았는지 확인해 주세요.");
+      console.warn("샘플 PDF 자동 생성 생략 (원본은 정상 업로드됨):", e);
     }
   }
 

@@ -3,9 +3,10 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   serverExternalPackages: ["pdf-lib", "@pdf-lib/fontkit", "nodemailer"],
   outputFileTracingIncludes: {
-    "/api/download/[token]": ["./public/vendor/Pretendard-SemiBold.ttf"],
-    "/api/admin/products": ["./public/vendor/Pretendard-SemiBold.ttf"],
-    "/api/admin/products/[id]": ["./public/vendor/Pretendard-SemiBold.ttf"],
+    "/*": [
+      "./public/vendor/Pretendard-SemiBold.ttf",
+      "./node_modules/pretendard/dist/public/static/alternative/Pretendard-SemiBold.ttf",
+    ],
   },
   poweredByHeader: false,
 };
