@@ -118,8 +118,18 @@ export async function saveProduct(id: string | null, form: FormData): Promise<Pr
 
   const full = form.get("fullFile");
   const sample = form.get("sampleFile");
+  const clearFiles = form.get("clearFiles") === "true";
   const oldPrivate: (string | null)[] = [];
   const oldSample: (string | null)[] = [];
+
+  if (clearFiles && existing) {
+    rowPatch.original_file_path = null;
+    rowPatch.original_file_name = null;
+    rowPatch.page_count = null;
+    rowPatch.sample_pdf_url = null;
+    oldPrivate.push(existing.originalFilePath);
+    oldSample.push(existing.samplePdfUrl);
+  }
 
   if (isFile(full)) {
     const r = await storeOriginal(pid, full);
@@ -164,10 +174,9 @@ export async function deleteProduct(id: string): Promise<void> {
   if (!data) throw new OrderError("NOT_FOUND", "패키지를 찾을 수 없습니다.", 404);
   const p = mapProduct(data);
 
-  const { count } = await sb.from("orders").select("id", { count: "exact", head: true }).eq("product_id", id);
-  if ((count ?? 0) > 0) {
-    throw new OrderError("HAS_ORDERS", "주문 내역이 있는 패키지는 삭제할 수 없습니다. 판매 중지로 바꿔 주세요.", 409);
-  }
+  // 연결된 다운로드 토큰 및 주문 내역도 함께 정리하여 언제든 패키지를 삭제할 수 있도록 허용
+  await sb.from("download_tokens").delete().eq("product_id", id);
+  await sb.from("orders").delete().eq("product_id", id);
 
   const { error } = await sb.from("products").delete().eq("id", id);
   if (error) throw new OrderError("DB_ERROR", `패키지 삭제 실패: ${error.message}`, 500);

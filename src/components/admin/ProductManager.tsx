@@ -84,6 +84,24 @@ export function ProductManager({ initial, dbError }: { initial: Product[]; dbErr
     await send(`/api/admin/products/${p.id}`, "PATCH", fd);
   };
 
+  const clearUploadedFiles = async (p: Product) => {
+    const fd = new FormData();
+    fd.set("title", p.title);
+    fd.set("subject", p.subject ?? "");
+    fd.set("difficulty", p.difficulty ?? "");
+    fd.set("questionCount", p.questionCount?.toString() ?? "");
+    fd.set("price", String(p.price));
+    fd.set("description", p.description ?? "");
+    fd.set("sortOrder", String(p.sortOrder));
+    fd.set("isActive", String(p.isActive));
+    fd.set("clearFiles", "true");
+    const ok = await send(`/api/admin/products/${p.id}`, "PATCH", fd);
+    if (ok) {
+      setFlash({ tone: "ok", text: `"${p.title}"에 업로드된 문제 파일을 삭제했습니다.` });
+      if (editing?.id === p.id) reset();
+    }
+  };
+
   const input = (k: keyof typeof EMPTY) => ({ value: f[k] as string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF((s) => ({ ...s, [k]: e.target.value })) });
 
   return (
@@ -131,15 +149,20 @@ export function ProductManager({ initial, dbError }: { initial: Product[]; dbErr
                 </span>
                 <span role="cell" className="catalog__actions">
                   <button type="button" className="btn btn--ghost btn--sm" data-agent-action="edit-product" aria-label={`${p.title} 수정`} onClick={() => edit(p)}>수정</button>
+                  {p.originalFilePath || p.samplePdfUrl ? (
+                    <button type="button" className="btn btn--ghost btn--sm" data-agent-action="clear-product-files" aria-label={`${p.title} 업로드된 파일 삭제`} disabled={busy} onClick={() => clearUploadedFiles(p)}>
+                      파일 삭제
+                    </button>
+                  ) : null}
                   <button type="button" className="btn btn--ghost btn--sm" data-agent-action="toggle-product" aria-label={`${p.title} ${p.isActive ? "판매 중지" : "판매 재개"}`} disabled={busy} onClick={() => toggle(p)}>
                     {p.isActive ? "판매 중지" : "판매 재개"}
                   </button>
                   {confirmDelete === p.id ? (
-                    <button type="button" className="btn btn--danger btn--sm" data-agent-action="confirm-delete-product" disabled={busy} onClick={async () => { await send(`/api/admin/products/${p.id}`, "DELETE"); setConfirmDelete(null); }}>
+                    <button type="button" className="btn btn--danger btn--sm" data-agent-action="confirm-delete-product" disabled={busy} onClick={async () => { const ok = await send(`/api/admin/products/${p.id}`, "DELETE"); if (ok) setFlash({ tone: "ok", text: `"${p.title}" 패키지를 삭제했습니다.` }); setConfirmDelete(null); }}>
                       삭제 확정
                     </button>
                   ) : (
-                    <button type="button" className="btn btn--ghost btn--sm" data-agent-action="delete-product" aria-label={`${p.title} 삭제`} onClick={() => setConfirmDelete(p.id)}>삭제</button>
+                    <button type="button" className="btn btn--ghost btn--sm" data-agent-action="delete-product" aria-label={`${p.title} 삭제`} onClick={() => setConfirmDelete(p.id)}>패키지 삭제</button>
                   )}
                 </span>
               </div>
