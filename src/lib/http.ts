@@ -38,6 +38,7 @@ export async function adminRoute(req: Request, fn: () => Promise<unknown> | unkn
   } catch (e) {
     if (e instanceof OrderError) return fail(e.status, e.message, { code: e.code });
     console.error(e);
-    return fail(500, "처리 중 오류가 발생했습니다.");
+    const detail = e instanceof Error ? e.message : "알 수 없는 오류";
+    return fail(500, `처리 중 오류가 발생했습니다: ${detail}`);
   }
 }

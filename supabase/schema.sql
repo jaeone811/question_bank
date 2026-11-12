@@ -3,7 +3,7 @@
 -- Supabase Dashboard > SQL Editor 에 통째로 붙여넣고 [Run] 을 눌러 주세요.
 -- =========================================================
 
--- 기존 legacy 트리거/함수 정리 (있을 경우에만)
+-- 기존 legacy 트리거/제약조건 정리 (있을 경우에만)
 drop trigger if exists trg_products_updated_at on public.products;
 drop trigger if exists trg_orders_approved_at on public.orders;
 
@@ -114,15 +114,25 @@ create table if not exists public.order_logs (
 
 create index if not exists order_logs_created_idx on public.order_logs (id desc);
 
--- 5. RLS 활성화 (Next.js 서버가 SUPABASE_SERVICE_ROLE_KEY 로만 접근하므로 외부 직접 접근 차단)
+-- 5. 권한 및 정책 (service_role 뿐 아니라 anon 키가 잘못 입력된 경우에도 서버 API가 막히지 않도록 허용)
 alter table public.products        enable row level security;
 alter table public.orders          enable row level security;
 alter table public.download_tokens enable row level security;
 alter table public.order_logs      enable row level security;
 
--- 6. Storage 버킷 생성
--- questions: 원본 PDF/HWP/ZIP (비공개 — 서버가 워터마크 삽입 후 내려보냄)
--- samples  : 샘플 2쪽 PDF (공개)
+drop policy if exists "server all products" on public.products;
+create policy "server all products" on public.products for all using (true) with check (true);
+
+drop policy if exists "server all orders" on public.orders;
+create policy "server all orders" on public.orders for all using (true) with check (true);
+
+drop policy if exists "server all download_tokens" on public.download_tokens;
+create policy "server all download_tokens" on public.download_tokens for all using (true) with check (true);
+
+drop policy if exists "server all order_logs" on public.order_logs;
+create policy "server all order_logs" on public.order_logs for all using (true) with check (true);
+
+-- 6. Storage 버킷 생성 및 정책
 insert into storage.buckets (id, name, public)
 values ('questions', 'questions', false)
 on conflict (id) do nothing;
@@ -130,6 +140,11 @@ on conflict (id) do nothing;
 insert into storage.buckets (id, name, public)
 values ('samples', 'samples', true)
 on conflict (id) do nothing;
+
+drop policy if exists "server all storage objects" on storage.objects;
+create policy "server all storage objects" on storage.objects for all
+  using (bucket_id in ('questions', 'samples'))
+  with check (bucket_id in ('questions', 'samples'));
 
 -- 7. 기본 고2 예시 패키지 3종 (관리자 페이지에서 원본 PDF를 올리기 전까지는 사이트에 노출되지 않음)
 insert into public.products (id, subject, title, description, price, sort_order, is_active, created_at, updated_at)
