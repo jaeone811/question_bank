@@ -370,12 +370,17 @@ function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; 
               </div>
             </div>
             {needInsta ? (
-              <Field label="인스타그램 아이디" hint="메시지 요청함으로 갈 수 있으니 요청함도 확인해 주세요." error={errors.buyerInstagram}>
-                <span className="prefixed">
-                  <span aria-hidden="true">@</span>
-                  <input data-field="buyerInstagram" className="num" value={f.buyerInstagram} onChange={(e) => set("buyerInstagram", e.target.value.replace(/^@+/, "").toLowerCase())} maxLength={30} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="my.instagram" />
-                </span>
-              </Field>
+              <>
+                <p className="notice notice--wait">
+                  <b>인스타그램 비공개 계정 안내:</b> 계정이 <b>비공개</b>이거나 메시지 요청 허용이 꺼져 있으면 DM 발송이 불가능합니다. 링크 수령 전까지 <b>비공개를 해제</b>해 주시거나, 위에서 <b>이메일</b>(또는 <b>둘 다</b>) 수령을 선택해 주세요.
+                </p>
+                <Field label="인스타그램 아이디" hint="비공개 계정은 반드시 공개로 전환해 주세요. 발송된 메시지는 '메시지 요청함'에 들어갈 수 있습니다." error={errors.buyerInstagram}>
+                  <span className="prefixed">
+                    <span aria-hidden="true">@</span>
+                    <input data-field="buyerInstagram" className="num" value={f.buyerInstagram} onChange={(e) => set("buyerInstagram", e.target.value.replace(/^@+/, "").toLowerCase())} maxLength={30} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="my.instagram" />
+                  </span>
+                </Field>
+              </>
             ) : null}
             {needEmail ? (
               <Field label="이메일 주소" error={errors.buyerEmail}>
