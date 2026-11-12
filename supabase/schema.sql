@@ -3,6 +3,10 @@
 -- Supabase Dashboard > SQL Editor 에 통째로 붙여넣고 [Run] 을 눌러 주세요.
 -- =========================================================
 
+-- 기존 legacy 트리거/함수 정리 (있을 경우에만)
+drop trigger if exists trg_products_updated_at on public.products;
+drop trigger if exists trg_orders_approved_at on public.orders;
+
 -- 1. 패키지(상품) 테이블
 create table if not exists public.products (
   id                 text primary key,
@@ -19,11 +23,11 @@ create table if not exists public.products (
   original_file_name text,
   sort_order         integer not null default 0,
   is_active          boolean not null default true,
-  created_at         bigint not null,
-  updated_at         bigint not null
+  created_at         bigint not null default (extract(epoch from now()) * 1000)::bigint,
+  updated_at         bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 
--- 기존 legacy 테이블이 있는 경우 호환 컬럼 추가
+-- 기존 legacy 테이블이 이미 만들어져 있던 경우 컬럼 및 타입 호환 패치
 alter table public.products add column if not exists grade text not null default '고2';
 alter table public.products add column if not exists difficulty text;
 alter table public.products add column if not exists question_count integer;
@@ -31,6 +35,28 @@ alter table public.products add column if not exists page_count integer;
 alter table public.products add column if not exists sample_pdf_url text;
 alter table public.products add column if not exists original_file_path text;
 alter table public.products add column if not exists original_file_name text;
+alter table public.products add column if not exists sort_order integer not null default 0;
+alter table public.products add column if not exists is_active boolean not null default true;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'products' and column_name = 'created_at' and data_type <> 'bigint'
+  ) then
+    alter table public.products alter column created_at drop default;
+    alter table public.products alter column created_at type bigint using (extract(epoch from created_at) * 1000)::bigint;
+    alter table public.products alter column created_at set default (extract(epoch from now()) * 1000)::bigint;
+  end if;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'products' and column_name = 'updated_at' and data_type <> 'bigint'
+  ) then
+    alter table public.products alter column updated_at drop default;
+    alter table public.products alter column updated_at type bigint using (extract(epoch from updated_at) * 1000)::bigint;
+    alter table public.products alter column updated_at set default (extract(epoch from now()) * 1000)::bigint;
+  end if;
+end $$;
 
 -- 2. 주문 테이블
 create table if not exists public.orders (
@@ -51,7 +77,7 @@ create table if not exists public.orders (
   download_url         text,                    -- 최신 발급된 5시간 다운로드 링크 (피클 AI / 관리자 전달용)
   email_sent_at        bigint,
   email_error          text,
-  created_at           bigint not null,
+  created_at           bigint not null default (extract(epoch from now()) * 1000)::bigint,
   approved_at          bigint,
   delivered_at         bigint
 );
@@ -72,7 +98,7 @@ create table if not exists public.download_tokens (
   last_downloaded_at bigint,
   client_ip_log      text not null default '[]',
   is_revoked         boolean not null default false,
-  created_at         bigint not null
+  created_at         bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 
 create index if not exists download_tokens_order_idx on public.download_tokens (order_id);
@@ -83,7 +109,7 @@ create table if not exists public.order_logs (
   order_id   text,
   level      text not null default 'info',
   message    text not null,
-  created_at bigint not null
+  created_at bigint not null default (extract(epoch from now()) * 1000)::bigint
 );
 
 create index if not exists order_logs_created_idx on public.order_logs (id desc);

@@ -140,7 +140,7 @@ export async function saveProduct(id: string | null, form: FormData): Promise<Pr
 
   if (existing) {
     const { data, error } = await sb.from("products").update(rowPatch).eq("id", pid).select("*").single();
-    if (error || !data) throw new Error(`패키지 수정 실패: ${error?.message}`);
+    if (error || !data) throw new OrderError("DB_ERROR", `패키지 수정 실패: ${error?.message ?? "알 수 없는 오류"}`, 500);
     for (const f of oldPrivate) await removePrivateFile(f);
     for (const f of oldSample) await removeSampleFile(f);
     return mapProduct(data);
@@ -150,7 +150,7 @@ export async function saveProduct(id: string | null, form: FormData): Promise<Pr
       .insert({ id: pid, grade: "고2", created_at: now, ...rowPatch })
       .select("*")
       .single();
-    if (error || !data) throw new Error(`패키지 등록 실패: ${error?.message}`);
+    if (error || !data) throw new OrderError("DB_ERROR", `패키지 등록 실패: ${error?.message ?? "알 수 없는 오류"}`, 500);
     return mapProduct(data);
   }
 }
@@ -167,18 +167,31 @@ export async function deleteProduct(id: string): Promise<void> {
   }
 
   const { error } = await sb.from("products").delete().eq("id", id);
-  if (error) throw new Error(`패키지 삭제 실패: ${error.message}`);
+  if (error) throw new OrderError("DB_ERROR", `패키지 삭제 실패: ${error.message}`, 500);
   await removePrivateFile(p.originalFilePath);
   await removeSampleFile(p.samplePdfUrl);
 }
 
+export async function allProductsWithStatus(): Promise<{ products: Product[]; dbError: string | null }> {
+  try {
+    const sb = getSupabase();
+    const { data, error } = await sb
+      .from("products")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    if (error) {
+      console.error("패키지 목록 조회 실패:", error.message);
+      return { products: [], dbError: `Supabase 조회 오류: ${error.message}` };
+    }
+    return { products: (data ?? []).map(mapProduct), dbError: null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Supabase 연결 실패";
+    console.error("패키지 목록 조회 예외:", msg);
+    return { products: [], dbError: msg };
+  }
+}
+
 export async function allProducts(): Promise<Product[]> {
-  const sb = getSupabase();
-  const { data, error } = await sb
-    .from("products")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-  if (error) throw new Error(`패키지 목록 조회 실패: ${error.message}`);
-  return (data ?? []).map(mapProduct);
+  const { products } = await allProductsWithStatus();
+  return products;
 }

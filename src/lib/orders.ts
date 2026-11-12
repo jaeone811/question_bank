@@ -66,19 +66,23 @@ export async function logOrder(
 }
 
 export async function sellableProducts(): Promise<Product[]> {
-  const sb = getSupabase();
-  const { data, error } = await sb
-    .from("products")
-    .select("*")
-    .eq("is_active", true)
-    .not("original_file_path", "is", null)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-  if (error) {
-    console.error("판매 상품 조회 실패:", error.message);
+  try {
+    const sb = getSupabase();
+    const { data, error } = await sb
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .not("original_file_path", "is", null)
+      .order("sort_order", { ascending: true });
+    if (error) {
+      console.error("판매 상품 조회 실패:", error.message);
+      return [];
+    }
+    return (data ?? []).map(mapProduct);
+  } catch (e) {
+    console.error("판매 상품 조회 예외:", e);
     return [];
   }
-  return (data ?? []).map(mapProduct);
 }
 
 // 주문 접수: 금액은 서버가 상품 가격으로 계산. 이메일 접수 안내 및 피클 AI 웹훅 호출

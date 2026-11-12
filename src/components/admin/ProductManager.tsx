@@ -6,7 +6,7 @@ import { won } from "@/lib/format";
 
 const EMPTY = { title: "", subject: "", difficulty: "", questionCount: "", price: "", description: "", sortOrder: "0", isActive: true };
 
-export function ProductManager({ initial }: { initial: Product[] }) {
+export function ProductManager({ initial, dbError }: { initial: Product[]; dbError?: string | null }) {
   const [list, setList] = useState(initial);
   const [editing, setEditing] = useState<Product | null>(null);
   const [f, setF] = useState(EMPTY);
@@ -95,6 +95,11 @@ export function ProductManager({ initial }: { initial: Product[] }) {
             <h1>패키지 관리</h1>
           </div>
         </div>
+        {dbError ? (
+          <p className="notice notice--bad" role="alert">
+            <b>데이터베이스 연결 확인 필요:</b> {dbError} (Supabase SQL Editor에서 <code>supabase/schema.sql</code>을 실행했는지, Vercel 환경변수에 <code>SUPABASE_URL</code>과 <code>SUPABASE_SERVICE_ROLE_KEY</code>가 올바르게 들어갔는지 확인해 주세요.)
+          </p>
+        ) : null}
         {flash ? <p className={`notice notice--${flash.tone}`} role="status">{flash.text}</p> : null}
 
         <div className="catalog catalog--admin" role="table" aria-label="등록된 패키지">
