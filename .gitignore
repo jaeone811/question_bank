@@ -1,0 +1,11 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.env
+.env.local
+data/
+storage/private/
+storage/samples/
+.agent-vault/
+public/vendor/
