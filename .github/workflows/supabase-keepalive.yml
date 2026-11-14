@@ -1,0 +1,13 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    - cron: "0 0,12 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping keep-alive endpoint
+        run: curl -fsSL https://question-bank-tawny.vercel.app/api/keep-alive
