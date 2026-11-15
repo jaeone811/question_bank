@@ -616,6 +616,12 @@ select {
 .catalog__row:hover {
   background: #fcfbf9;
 }
+.catalog:not(.catalog--admin) .catalog__row {
+  cursor: pointer;
+}
+.catalog:not(.catalog--admin) .catalog__row:hover .catalog__title {
+  background-size: 100% 1px;
+}
 .catalog__row[data-current] {
   box-shadow: inset 3px 0 0 var(--accent);
 }

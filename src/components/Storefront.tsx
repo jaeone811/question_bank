@@ -74,6 +74,11 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
   const shown = products.filter((p) => (!subject || p.subject === subject) && (!grade || p.grade === grade));
   const featured = shown.find((p) => p.id === featuredId) ?? shown.find((p) => p.sampleUrl) ?? shown[0] ?? null;
 
+  const selectFeatured = (id: string) => {
+    setFeaturedId(id);
+    document.querySelector(".hero__show")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   return (
     <>
       <section className="hero" data-enter>
@@ -138,7 +143,7 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
                 aria-label={`${featured.title} 샘플 크게 보기`}
               >
                 {featured.sampleUrl ? (
-                  <PdfPreview key={featured.sampleUrl} url={featured.sampleUrl} label={`${featured.title} 샘플`} />
+                  <PdfPreview key={`${featured.id}-${featured.sampleUrl}`} url={featured.sampleUrl} label={`${featured.title} 샘플`} />
                 ) : (
                   <span className="sheet__empty">샘플을 준비하고 있습니다</span>
                 )}
@@ -178,10 +183,23 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
                 <span role="columnheader" className="sr">선택</span>
               </div>
               {shown.map((p) => (
-                <div className="catalog__row" role="row" key={p.id} data-current={featured?.id === p.id || undefined}>
+                <div
+                  className="catalog__row"
+                  role="row"
+                  key={p.id}
+                  data-current={featured?.id === p.id || undefined}
+                  onClick={() => selectFeatured(p.id)}
+                >
                   <span role="cell" className="catalog__subject">{p.subject ?? "기타"}</span>
                   <span role="cell" className="catalog__main">
-                    <button type="button" className="catalog__title" onClick={() => { setFeaturedId(p.id); document.querySelector(".hero__show")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
+                    <button
+                      type="button"
+                      className="catalog__title"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectFeatured(p.id);
+                      }}
+                    >
                       {p.title}
                     </button>
                     {p.description ? <span className="catalog__desc">{p.description}</span> : null}
@@ -190,11 +208,11 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
                   <span role="cell" data-label="문항" className="num r">{dash(p.questionCount)}</span>
                   <span role="cell" data-label="분량" className="num r">{dash(p.pageCount, "쪽")}</span>
                   <span role="cell" data-label="가격" className="r catalog__price"><PriceTag price={p.price} discounted={classDiscount} /></span>
-                  <span role="cell" className="catalog__actions">
-                    <button type="button" className="btn btn--ghost btn--sm" disabled={!p.sampleUrl} onClick={() => setSample(p)}>
+                  <span role="cell" className="catalog__actions" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" className="btn btn--ghost btn--sm" disabled={!p.sampleUrl} onClick={() => { setFeaturedId(p.id); setSample(p); }}>
                       {p.sampleUrl ? "샘플 보기" : "샘플 준비 중"}
                     </button>
-                    <button type="button" className="btn btn--primary btn--sm" onClick={() => setBuying(p)}>구매하기</button>
+                    <button type="button" className="btn btn--primary btn--sm" onClick={() => { setFeaturedId(p.id); setBuying(p); }}>구매하기</button>
                   </span>
                 </div>
               ))}
