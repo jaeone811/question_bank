@@ -149,6 +149,9 @@ select {
 .wrap--narrow {
   max-width: 760px;
 }
+.section--wide .wrap {
+  max-width: 1380px;
+}
 .eyebrow {
   font-size: 0.82rem;
   font-weight: 650;
@@ -580,7 +583,20 @@ select {
 }
 .catalog--admin .catalog__head,
 .catalog--admin .catalog__row {
-  grid-template-columns: 64px minmax(0, 1fr) 150px 96px 128px 232px;
+  grid-template-columns: 76px minmax(200px, 1fr) 148px 96px 124px;
+  gap: 10px 14px;
+}
+.catalog--admin .catalog__row > [data-label="파일"] {
+  font-size: 0.88rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.catalog--admin .catalog__actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--line);
 }
 .catalog__head {
   font-size: 0.8rem;
@@ -607,6 +623,8 @@ select {
   font-weight: 700;
   font-size: 0.86rem;
   color: var(--accent);
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .catalog__main {
   display: grid;
@@ -622,6 +640,8 @@ select {
   font-size: 1.02rem;
   text-align: left;
   cursor: pointer;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   background-image: linear-gradient(var(--ink), var(--ink));
   background-size: 0 1px;
   background-position: 0 100%;
@@ -634,10 +654,13 @@ button.catalog__title:hover {
 .catalog__desc {
   color: var(--muted);
   font-size: 0.88rem;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .catalog__price {
   font-weight: 700;
   font-size: 1rem;
+  white-space: nowrap;
 }
 .catalog__actions {
   display: flex;
@@ -980,6 +1003,7 @@ button.catalog__title:hover {
 .field__label {
   font-weight: 650;
   font-size: 0.92rem;
+  white-space: nowrap;
 }
 .field input:not([type="checkbox"]):not([type="file"]),
 .field textarea,
@@ -1478,7 +1502,7 @@ button.catalog__title:hover {
 }
 
 /* ---------- 반응형 ---------- */
-@media (max-width: 1080px) {
+@media (max-width: 1160px) {
   .console {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1518,7 +1542,9 @@ button.catalog__title:hover {
     font-weight: 600;
     color: var(--muted);
   }
-  .catalog__actions {
+  .catalog__actions,
+  .catalog--admin .catalog__actions {
+    grid-column: 1 / -1;
     justify-content: stretch;
   }
   .catalog__actions .btn {
