@@ -16,7 +16,7 @@ import { productLabel } from "./format";
 import { ackMessage, linkMessage } from "./messages";
 import { getSupabase } from "./supabase";
 import { activeTokenFor, issueDownloadToken } from "./tokens";
-import type { OrderInput } from "./validation";
+import { calcClassPrice, CLASS_DISCOUNT_CODE, type OrderInput } from "./validation";
 
 export class OrderError extends Error {
   constructor(
@@ -99,6 +99,8 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; pr
   const id = randomUUID();
   const orderNumber = newOrderNumber(now);
   let status: OrderStatus = "PENDING_VERIFICATION";
+  const isClassDiscount = input.discountCode === CLASS_DISCOUNT_CODE;
+  const finalAmount = calcClassPrice(product.price, isClassDiscount);
 
   const { data: inserted, error } = await sb
     .from("orders")
@@ -113,7 +115,7 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; pr
       buyer_phone: input.buyerPhone,
       preferred_channel: input.preferredChannel,
       payment_method: input.paymentMethod,
-      total_amount: product.price,
+      total_amount: finalAmount,
       status,
       created_at: now,
     })
@@ -123,7 +125,10 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; pr
   if (error || !inserted) throw new Error(`주문 생성 실패: ${error?.message}`);
   const order = mapOrder(inserted);
 
-  await logOrder(`새 주문 접수: ${order.orderNumber} (${order.depositorName}, ${productLabel(product)})`, {
+  const discountLog = isClassDiscount
+    ? `, 2-8 학급 20% 할인${input.studentNo ? ` [${input.studentNo}]` : ""}: ${product.price.toLocaleString("ko-KR")}원 → ${finalAmount.toLocaleString("ko-KR")}원`
+    : "";
+  await logOrder(`새 주문 접수: ${order.orderNumber} (${order.depositorName}, ${productLabel(product)}${discountLog})`, {
     orderId: order.id,
   });
 

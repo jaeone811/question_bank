@@ -4,6 +4,13 @@ import type { PreferredChannel, PaymentMethod } from "../db/schema";
 const CHANNELS: PreferredChannel[] = ["INSTAGRAM_DM", "EMAIL", "BOTH"];
 const PAYMENT_METHODS: PaymentMethod[] = ["BANK", "KAKAOPAY", "TOSS"];
 
+export const CLASS_DISCOUNT_CODE = "2-8GOV";
+export const CLASS_DISCOUNT_RATE = 0.2;
+
+export function calcClassPrice(price: number, discounted: boolean): number {
+  return discounted ? Math.round(price * (1 - CLASS_DISCOUNT_RATE)) : price;
+}
+
 export const RE = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
   instagram: /^[a-z0-9._]{1,30}$/,
@@ -19,6 +26,8 @@ export type OrderInput = {
   buyerPhone: string;
   preferredChannel: PreferredChannel;
   paymentMethod: PaymentMethod;
+  discountCode: string | null;
+  studentNo: string | null;
 };
 
 export type FieldErrors = Partial<Record<keyof OrderInput | "agreeRefund" | "agreeCopyright", string>>;
@@ -35,6 +44,9 @@ export function validateOrder(body: Record<string, unknown>): { ok: true; data: 
   const phone = str(body.buyerPhone).replace(/[\s-]/g, "");
   const channel = str(body.preferredChannel) as PreferredChannel;
   const method = str(body.paymentMethod) as PaymentMethod;
+  const rawDiscount = str(body.discountCode).toUpperCase();
+  const discountCode = rawDiscount === CLASS_DISCOUNT_CODE ? CLASS_DISCOUNT_CODE : null;
+  const studentNo = str(body.studentNo).slice(0, 20) || null;
 
   if (!str(body.productId)) errors.productId = "자료를 선택해 주세요.";
   if (buyerName.length < 1 || buyerName.length > 20) errors.buyerName = "성함을 20자 이내로 입력해 주세요.";
@@ -66,6 +78,8 @@ export function validateOrder(body: Record<string, unknown>): { ok: true; data: 
       buyerPhone: phone,
       preferredChannel: channel,
       paymentMethod: method,
+      discountCode,
+      studentNo,
     },
   };
 }

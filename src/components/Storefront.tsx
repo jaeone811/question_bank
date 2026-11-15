@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { won } from "@/lib/format";
-import { validateOrder, type FieldErrors } from "@/lib/validation";
+import { calcClassPrice, CLASS_DISCOUNT_CODE, validateOrder, type FieldErrors } from "@/lib/validation";
 import { PdfPreview } from "./PdfPreview";
 
 export type StoreProduct = {
@@ -34,6 +34,42 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
   const [featuredId, setFeaturedId] = useState<string | null>(null);
   const [sample, setSample] = useState<StoreProduct | null>(null);
   const [buying, setBuying] = useState<StoreProduct | null>(null);
+  const [classDiscount, setClassDiscount] = useState(false);
+  const [studentNo, setStudentNo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from")?.toLowerCase();
+    const ref = params.get("ref")?.toLowerCase();
+    const discount = params.get("discount")?.toUpperCase();
+    const student = params.get("student")?.trim().slice(0, 20) || "";
+    const fromReferrer = document.referrer.toLowerCase().includes("2-8gov.netlify.app");
+    const matched =
+      from === "2-8gov" ||
+      ref === "2-8gov" ||
+      discount === CLASS_DISCOUNT_CODE ||
+      discount === "CLASS28" ||
+      fromReferrer;
+
+    let savedDiscount = false;
+    let savedStudent: string | null = null;
+    try {
+      if (matched) {
+        localStorage.setItem("qb_class28_discount", "1");
+        if (student) localStorage.setItem("qb_class28_student", student);
+      }
+      savedDiscount = localStorage.getItem("qb_class28_discount") === "1";
+      savedStudent = student || localStorage.getItem("qb_class28_student");
+    } catch {
+      // localStorage 사용 불가 환경에서도 현재 세션은 할인 적용
+      savedStudent = student || null;
+    }
+
+    if (matched || savedDiscount) {
+      setClassDiscount(true);
+      if (savedStudent) setStudentNo(savedStudent);
+    }
+  }, []);
 
   const shown = products.filter((p) => (!subject || p.subject === subject) && (!grade || p.grade === grade));
   const featured = shown.find((p) => p.id === featuredId) ?? shown.find((p) => p.sampleUrl) ?? shown[0] ?? null;
@@ -41,6 +77,16 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
   return (
     <>
       <section className="hero" data-enter>
+        {classDiscount ? (
+          <div className="wrap">
+            <div className="class-banner" role="status">
+              <span className="class-banner__badge">2-8 전자정부 연동</span>
+              <p>
+                🎓 <b>해원고 2학년 8반 전자정부 연동 완료</b> — {studentNo ? `${studentNo} 학생, ` : ""}모든 자료에 <b>20% 상시 할인</b>이 자동 적용되었습니다.
+              </p>
+            </div>
+          </div>
+        ) : null}
         <div className="wrap hero__grid">
           <div className="hero__copy">
             <p className="eyebrow">고2 기말고사 대비</p>
@@ -105,7 +151,7 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
                   <div><dt>문항 수</dt><dd className="num">{dash(featured.questionCount, "문항")}</dd></div>
                   <div><dt>분량</dt><dd className="num">{dash(featured.pageCount, "쪽")}</dd></div>
                   <div><dt>형식</dt><dd>PDF</dd></div>
-                  <div className="spec__price"><dt>가격</dt><dd className="num">{won(featured.price)}원</dd></div>
+                  <div className="spec__price"><dt>가격</dt><dd><PriceTag price={featured.price} discounted={classDiscount} /></dd></div>
                 </dl>
                 <button type="button" className="btn btn--primary btn--block" onClick={() => setBuying(featured)}>이 자료 구매하기</button>
               </div>
@@ -143,7 +189,7 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
                   <span role="cell" data-label="난이도">{dash(p.difficulty)}</span>
                   <span role="cell" data-label="문항" className="num r">{dash(p.questionCount)}</span>
                   <span role="cell" data-label="분량" className="num r">{dash(p.pageCount, "쪽")}</span>
-                  <span role="cell" data-label="가격" className="num r catalog__price">{won(p.price)}원</span>
+                  <span role="cell" data-label="가격" className="r catalog__price"><PriceTag price={p.price} discounted={classDiscount} /></span>
                   <span role="cell" className="catalog__actions">
                     <button type="button" className="btn btn--ghost btn--sm" disabled={!p.sampleUrl} onClick={() => setSample(p)}>
                       {p.sampleUrl ? "샘플 보기" : "샘플 준비 중"}
@@ -187,9 +233,21 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
         </div>
       </section>
 
-      {sample ? <SampleModal product={sample} onClose={() => setSample(null)} onBuy={() => { setBuying(sample); setSample(null); }} /> : null}
-      {buying ? <Checkout product={buying} pay={pay} onClose={() => setBuying(null)} /> : null}
+      {sample ? <SampleModal product={sample} classDiscount={classDiscount} onClose={() => setSample(null)} onBuy={() => { setBuying(sample); setSample(null); }} /> : null}
+      {buying ? <Checkout product={buying} pay={pay} classDiscount={classDiscount} studentNo={studentNo} onClose={() => setBuying(null)} /> : null}
     </>
+  );
+}
+
+function PriceTag({ price, discounted }: { price: number; discounted: boolean }) {
+  if (!discounted) return <span className="num">{won(price)}원</span>;
+  const sale = calcClassPrice(price, true);
+  return (
+    <span className="price-wrap">
+      <del className="num price-origin">{won(price)}원</del>
+      <span className="num price-sale">{won(sale)}원</span>
+      <span className="price-badge">20% 할인</span>
+    </span>
   );
 }
 
@@ -219,7 +277,7 @@ function useOverlay(onClose: () => void) {
   return ref;
 }
 
-function SampleModal({ product, onClose, onBuy }: { product: StoreProduct; onClose: () => void; onBuy: () => void }) {
+function SampleModal({ product, classDiscount, onClose, onBuy }: { product: StoreProduct; classDiscount: boolean; onClose: () => void; onBuy: () => void }) {
   const ref = useOverlay(onClose);
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -235,7 +293,7 @@ function SampleModal({ product, onClose, onBuy }: { product: StoreProduct; onClo
           <PdfPreview url={product.sampleUrl!} maxPages={2} label={`${product.title} 샘플`} />
         </div>
         <footer className="modal__foot">
-          <span className="num modal__price">{won(product.price)}원</span>
+          <span className="modal__price"><PriceTag price={product.price} discounted={classDiscount} /></span>
           <a className="btn btn--ghost" href={product.sampleUrl!} target="_blank" rel="noopener">새 창에서 열기</a>
           <button type="button" className="btn btn--primary" onClick={onBuy}>구매하기</button>
         </footer>
@@ -246,7 +304,7 @@ function SampleModal({ product, onClose, onBuy }: { product: StoreProduct; onClo
 
 type Channel = "INSTAGRAM_DM" | "EMAIL" | "BOTH";
 
-function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; onClose: () => void }) {
+function Checkout({ product, pay, classDiscount, studentNo, onClose }: { product: StoreProduct; pay: Pay; classDiscount: boolean; studentNo: string | null; onClose: () => void }) {
   const ref = useOverlay(onClose);
   const router = useRouter();
   const [channel, setChannel] = useState<Channel>("INSTAGRAM_DM");
@@ -276,7 +334,16 @@ function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-    const body = { productId: product.id, ...f, preferredChannel: channel, paymentMethod: "BANK" as const, agreeRefund: agree.refund, agreeCopyright: agree.copyright };
+    const body = {
+      productId: product.id,
+      ...f,
+      preferredChannel: channel,
+      paymentMethod: "BANK" as const,
+      agreeRefund: agree.refund,
+      agreeCopyright: agree.copyright,
+      discountCode: classDiscount ? CLASS_DISCOUNT_CODE : null,
+      studentNo,
+    };
     const v = validateOrder(body);
     if (!v.ok) {
       setErrors(v.errors);
@@ -327,8 +394,8 @@ function Checkout({ product, pay, onClose }: { product: StoreProduct; pay: Pay; 
           <fieldset className="block">
             <legend><span className="step-no">1</span>계좌이체 송금하기</legend>
             <div className="amount">
-              <span>입금하실 금액</span>
-              <b className="num">{won(product.price)}원</b>
+              <span>입금하실 금액{classDiscount ? " (2-8 학급 20% 할인)" : ""}</span>
+              <b><PriceTag price={product.price} discounted={classDiscount} /></b>
             </div>
 
             {pay.bank.account ? (

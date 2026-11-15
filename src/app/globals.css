@@ -1575,3 +1575,66 @@ button.catalog__title:hover {
     flex: 1 1 100%;
   }
 }
+
+/* ---------- 해원고 2-8 학급 연동 20% 할인 ---------- */
+.class-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: clamp(20px, 3vw, 32px);
+  padding: 13px 16px;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-wash);
+  color: var(--ink);
+  font-size: 0.94rem;
+}
+.class-banner__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.price-wrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px 6px;
+}
+.modal__price .price-wrap {
+  justify-content: flex-start;
+}
+.price-origin {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.price-sale {
+  color: var(--accent);
+  font-weight: 750;
+}
+.price-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+@media (max-width: 960px) {
+  .catalog__row .price-wrap {
+    justify-content: flex-start;
+  }
+}
