@@ -23,8 +23,6 @@ export async function issueDownloadToken(orderId: string, productId: string, app
     product_id: productId,
     token_hash: hashToken(raw),
     expires_at: expiresAt,
-    download_count: 0,
-    max_downloads: config.maxDownloads,
     client_ip_log: "[]",
     is_revoked: false,
     created_at: Date.now(),
@@ -34,7 +32,7 @@ export async function issueDownloadToken(orderId: string, productId: string, app
   return { raw, expiresAt, url: `${config.siteUrl}/api/download/${raw}` };
 }
 
-export type TokenFailure = "invalid" | "revoked" | "expired" | "limit";
+export type TokenFailure = "invalid" | "revoked" | "expired";
 export type TokenCheck =
   | { ok: true; token: DownloadToken }
   | { ok: false; reason: TokenFailure; orderId?: string };
@@ -47,7 +45,7 @@ function verifySignature(raw: string): boolean {
   return expected.length === given.length && timingSafeEqual(expected, given);
 }
 
-// 서명 → DB → 폐기 → 만료 → 횟수 순으로 확인하고, 통과하면 횟수를 1 올림
+// 서명 → DB → 폐기 → 만료 순으로 확인하고 다운로드 기록 갱신
 export async function consumeDownloadToken(raw: string, ip: string, now = Date.now()): Promise<TokenCheck> {
   if (!verifySignature(raw)) return { ok: false, reason: "invalid" };
   const sb = getSupabase();
@@ -56,35 +54,22 @@ export async function consumeDownloadToken(raw: string, ip: string, now = Date.n
   const row = mapDownloadToken(data);
   if (row.isRevoked) return { ok: false, reason: "revoked", orderId: row.orderId };
   if (now >= row.expiresAt) return { ok: false, reason: "expired", orderId: row.orderId };
-  if (row.downloadCount >= row.maxDownloads) return { ok: false, reason: "limit", orderId: row.orderId };
 
   const ipLog = [...(JSON.parse(row.clientIpLog) as { ip: string; at: number }[]), { ip, at: now }].slice(-20);
-  const nextCount = row.downloadCount + 1;
   const { data: updated, error } = await sb
     .from("download_tokens")
     .update({
-      download_count: nextCount,
       last_downloaded_at: now,
       client_ip_log: JSON.stringify(ipLog),
     })
     .eq("id", row.id)
     .eq("is_revoked", false)
-    .eq("download_count", row.downloadCount)
     .gt("expires_at", now)
     .select("*")
     .maybeSingle();
 
-  if (error || !updated) return { ok: false, reason: "limit", orderId: row.orderId };
+  if (error || !updated) return { ok: false, reason: "expired", orderId: row.orderId };
   return { ok: true, token: mapDownloadToken(updated) };
-}
-
-// 파일 준비에 실패했을 때 차감한 횟수 되돌리기
-export async function refundDownload(tokenId: string): Promise<void> {
-  const sb = getSupabase();
-  const { data } = await sb.from("download_tokens").select("download_count").eq("id", tokenId).maybeSingle();
-  if (!data) return;
-  const next = Math.max(0, Number(data.download_count ?? 1) - 1);
-  await sb.from("download_tokens").update({ download_count: next }).eq("id", tokenId);
 }
 
 export async function activeTokenFor(orderId: string): Promise<DownloadToken | undefined> {

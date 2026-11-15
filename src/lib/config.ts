@@ -40,9 +40,6 @@ export const config = {
       apiKey: env("PICKLE_API_KEY"),
     };
   },
-  get maxDownloads() {
-    return Math.max(1, Number(env("MAX_DOWNLOADS", "3")) || 3);
-  },
 };
 
 export const LINK_TTL_MS = 5 * 60 * 60 * 1000; // 승인 시각 + 5시간 (18,000초)

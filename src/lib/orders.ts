@@ -10,7 +10,6 @@ import {
   type Product,
   type TaskChannel,
 } from "@/db/schema";
-import { config } from "./config";
 import { isEmailConfigured, notifyPickleWebhook, sendEmail } from "./email";
 import { productLabel } from "./format";
 import { ackMessage, linkMessage } from "./messages";
@@ -176,7 +175,7 @@ const REISSUABLE: OrderStatus[] = ["APPROVED", "DISPATCHING", "DELIVERED", "DISP
 async function dispatchOrderLink(order: Order, product: Product, approvedAt: number, isReissue = false) {
   const sb = getSupabase();
   const { url, expiresAt } = await issueDownloadToken(order.id, order.productId, approvedAt);
-  const message = linkMessage(order.buyerName, product, url, expiresAt, config.maxDownloads);
+  const message = linkMessage(order.buyerName, product, url, expiresAt);
   const channels = channelsOf(order);
 
   let emailSentAt: number | null = order.emailSentAt;
@@ -214,7 +213,6 @@ async function dispatchOrderLink(order: Order, product: Product, approvedAt: num
       productTitle: productLabel(product),
       downloadUrl: url,
       expiresAt,
-      maxDownloads: config.maxDownloads,
       message,
     });
     if (igDelivered) {
@@ -367,7 +365,6 @@ export async function publicOrderStatus(orderNumber: string) {
     approvedAt: order.approvedAt,
     deliveredAt: order.deliveredAt,
     expiresAt: token && order.approvedAt ? token.expiresAt : null,
-    downloadsLeft: token ? Math.max(0, token.maxDownloads - token.downloadCount) : null,
     reissueRequested: !!order.reissueRequestedAt,
   };
 }
@@ -397,14 +394,14 @@ export async function adminOverview() {
       const token = activeTokens.find((t) => t.orderId === order.id);
       const dmMessage =
         order.downloadUrl && token && product
-          ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt, token.maxDownloads)
+          ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt)
           : null;
       return {
         ...order,
         productLabel: label,
         dmMessage,
         token: token
-          ? { expiresAt: token.expiresAt, downloadCount: token.downloadCount, maxDownloads: token.maxDownloads }
+          ? { expiresAt: token.expiresAt }
           : null,
       };
     }),
@@ -435,7 +432,7 @@ export async function findOrderForPickle(query: { orderNumber?: string; instagra
   const token = await activeTokenFor(order.id);
   const message =
     order.downloadUrl && token && product
-      ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt, token.maxDownloads)
+      ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt)
       : null;
 
   return {
@@ -448,7 +445,6 @@ export async function findOrderForPickle(query: { orderNumber?: string; instagra
     amount: order.totalAmount,
     downloadUrl: order.downloadUrl,
     expiresAt: token?.expiresAt ?? null,
-    downloadsLeft: token ? Math.max(0, token.maxDownloads - token.downloadCount) : null,
     message,
   };
 }

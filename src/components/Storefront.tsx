@@ -21,7 +21,6 @@ export type StoreProduct = {
 
 type Pay = {
   bank: { name: string; account: string; holder: string };
-  maxDownloads: number;
 };
 
 const dash = (v: string | number | null | undefined, unit = "") => (v === null || v === undefined || v === "" ? "미정" : `${v}${unit}`);
@@ -232,7 +231,7 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
             <li><b>샘플 확인</b><span>자료마다 앞 2쪽을 그대로 보실 수 있습니다.</span></li>
             <li><b>계좌 송금 후 주문서 제출</b><span>안내된 계좌로 입금하시고 통장에 표시되는 입금자명을 적어 주세요.</span></li>
             <li><b>입금 확인</b><span>주문 조회 화면에서 진행 상황을 바로 확인하실 수 있습니다.</span></li>
-            <li><b>다운로드 링크 수령</b><span>승인 시각부터 5시간 동안, 최대 {pay.maxDownloads}회 받으실 수 있습니다.</span></li>
+            <li><b>다운로드 링크 수령</b><span>승인 시각부터 5시간 동안 받으실 수 있습니다.</span></li>
           </ol>
         </div>
       </section>
@@ -246,7 +245,7 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
             <div><dt>환불</dt><dd>디지털 자료 특성상 다운로드 링크가 발송된 뒤에는 환불이 어렵습니다. 링크 발송 전에는 요청하시면 전액 환불해 드립니다.</dd></div>
             <div><dt>워터마크</dt><dd>받으시는 PDF의 모든 쪽에 구매자 성함, 연락처, 주문번호가 반투명하게 표시됩니다.</dd></div>
             <div><dt>복제 금지</dt><dd>자료는 구매하신 분의 개인 학습용입니다. 공유, 재배포, 재판매는 허용되지 않습니다.</dd></div>
-            <div><dt>링크 만료</dt><dd>5시간이 지났거나 횟수를 모두 쓰신 경우 재발급을 요청하실 수 있습니다.</dd></div>
+            <div><dt>링크 만료</dt><dd>5시간이 지나 링크가 만료된 경우 재발급을 요청하실 수 있습니다.</dd></div>
           </dl>
         </div>
       </section>

@@ -23,7 +23,6 @@ export default async function Home() {
       products={products}
       pay={{
         bank: config.bank,
-        maxDownloads: config.maxDownloads,
       }}
     />
   );

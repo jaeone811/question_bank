@@ -86,15 +86,13 @@ create index if not exists orders_status_idx on public.orders (status, created_a
 create index if not exists orders_instagram_idx on public.orders (buyer_instagram);
 create index if not exists orders_phone_idx on public.orders (buyer_phone);
 
--- 3. 다운로드 토큰 테이블 (SHA-256 해시만 저장, 승인 후 5시간 · 기본 3회 제한)
+-- 3. 다운로드 토큰 테이블 (SHA-256 해시만 저장, 승인 후 5시간 유효)
 create table if not exists public.download_tokens (
   id                 text primary key,
   order_id           text not null references public.orders(id) on delete cascade,
   product_id         text not null references public.products(id),
   token_hash         text not null unique,
   expires_at         bigint not null,
-  download_count     integer not null default 0,
-  max_downloads      integer not null default 3,
   last_downloaded_at bigint,
   client_ip_log      text not null default '[]',
   is_revoked         boolean not null default false,

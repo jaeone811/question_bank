@@ -6,7 +6,7 @@ import { formatKst, productLabel } from "@/lib/format";
 import { clientIp, rateLimited } from "@/lib/http";
 import { watermarkPdf } from "@/lib/pdf";
 import { downloadPrivateFile, getSupabase } from "@/lib/supabase";
-import { consumeDownloadToken, refundDownload } from "@/lib/tokens";
+import { consumeDownloadToken } from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -57,12 +57,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
         "Content-Disposition": `attachment; filename="download${ext}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         "Cache-Control": "private, no-store",
         "X-Robots-Tag": "noindex",
-        "X-Downloads-Left": String(check.token.maxDownloads - check.token.downloadCount),
       },
     });
   } catch (e) {
     console.error("다운로드 실패", e);
-    await refundDownload(check.token.id);
     return new NextResponse("파일을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.", { status: 500 });
   }
 }

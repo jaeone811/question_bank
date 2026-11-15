@@ -57,7 +57,7 @@ export function OrderStatus({ initial }: { initial: PublicOrderStatus }) {
         <p className="lead">{h.body}</p>
         {o.status === "DELIVERED" && o.expiresAt ? (
           <p className="status__expiry">
-            링크는 <b className="num">{formatKst(o.expiresAt)}</b>까지 유효하며, 남은 횟수는 <b className="num">{o.downloadsLeft}</b>회입니다.
+            링크는 <b className="num">{formatKst(o.expiresAt)}</b>까지 유효합니다.
           </p>
         ) : null}
         {o.status === "EXPIRED" ? (

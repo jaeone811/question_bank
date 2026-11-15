@@ -66,8 +66,6 @@ export type DownloadToken = {
   productId: string;
   tokenHash: string;
   expiresAt: number;
-  downloadCount: number;
-  maxDownloads: number;
   lastDownloadedAt: number | null;
   clientIpLog: string;
   isRevoked: boolean;
@@ -155,8 +153,6 @@ export function mapDownloadToken(r: Record<string, unknown>): DownloadToken {
     productId: String(r.product_id),
     tokenHash: String(r.token_hash),
     expiresAt: toMs(r.expires_at),
-    downloadCount: Number(r.download_count ?? 0),
-    maxDownloads: Number(r.max_downloads ?? 3),
     lastDownloadedAt: toMsOrNull(r.last_downloaded_at),
     clientIpLog: String(r.client_ip_log ?? "[]"),
     isRevoked: Boolean(r.is_revoked ?? false),

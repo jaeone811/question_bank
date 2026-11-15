@@ -10,12 +10,12 @@ export function ackMessage(buyerName: string, product: P, greeting?: string) {
   );
 }
 
-export function linkMessage(buyerName: string, product: P, url: string, expiresAt: number, maxDownloads: number, greeting?: string) {
+export function linkMessage(buyerName: string, product: P, url: string, expiresAt: number, greeting?: string) {
   const head = greeting?.trim() || `안녕하세요 ${buyerName}님, 입금이 확인되어 [${productLabel(product)}] 자료를 보내드립니다.`;
   return [
     head,
     `다운로드: ${url}`,
-    `이 링크는 ${formatKst(expiresAt)} (한국 시간)까지, 최대 ${maxDownloads}회 받으실 수 있습니다.`,
+    `이 링크는 ${formatKst(expiresAt)} (한국 시간)까지 유효합니다.`,
     `자료에는 구매자 정보가 워터마크로 표시됩니다. 개인 학습용으로만 이용해 주세요.`,
   ].join("\n");
 }

@@ -170,7 +170,7 @@ function OrderCard({ o, busy, act, now }: { o: O; busy: string | null; act: (k: 
           {o.buyerInstagram ? <div><dt>인스타 아이디</dt><dd className="num">@{o.buyerInstagram}</dd></div> : null}
           {o.buyerEmail ? <div><dt>이메일 주소</dt><dd className="num">{o.buyerEmail}</dd></div> : null}
           {o.token ? (
-            <div><dt>링크 상태</dt><dd className="num" data-tone={expired ? "bad" : undefined}>{expired ? "만료됨" : `${formatKst(o.token.expiresAt)}까지`} · {o.token.downloadCount}/{o.token.maxDownloads}회 사용</dd></div>
+            <div><dt>링크 상태</dt><dd className="num" data-tone={expired ? "bad" : undefined}>{expired ? "만료됨" : `${formatKst(o.token.expiresAt)}까지 유효`}</dd></div>
           ) : null}
         </dl>
       </div>
