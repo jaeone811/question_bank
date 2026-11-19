@@ -38,6 +38,7 @@ export function SiteFooter() {
         <p>기말고사 문제은행. 모든 자료는 구매하신 분의 개인 학습용으로만 제공됩니다.</p>
         <p>
           <Link href="/download/expired">다운로드 링크 재발급</Link>
+          <Link href="/privacy">개인정보처리방침 및 데이터 삭제 안내</Link>
           <Link href="/admin/agent">관리자</Link>
         </p>
       </div>
