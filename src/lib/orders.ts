@@ -172,9 +172,25 @@ export async function createOrder(input: OrderInput): Promise<{ order: Order; pr
 const APPROVABLE: OrderStatus[] = ["PENDING_VERIFICATION", "NOTIFIED_USER"];
 const REISSUABLE: OrderStatus[] = ["APPROVED", "DISPATCHING", "DELIVERED", "DISPATCH_FAILED", "EXPIRED"];
 
-async function dispatchOrderLink(order: Order, product: Product, approvedAt: number, isReissue = false) {
+async function loadOrderAndProduct(orderId: string): Promise<{ order: Order; product: Product }> {
   const sb = getSupabase();
-  const { url, expiresAt } = await issueDownloadToken(order.id, order.productId, approvedAt);
+  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
+  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
+  const order = mapOrder(ordRow);
+  const { data: prodRow } = await sb.from("products").select("*").eq("id", order.productId).maybeSingle();
+  if (!prodRow) throw new OrderError("NOT_FOUND", "상품 정보를 찾을 수 없습니다.", 404);
+  return { order, product: mapProduct(prodRow) };
+}
+
+async function dispatchOrderLink(
+  order: Order,
+  product: Product,
+  approvedAt: number,
+  isReissue = false,
+  tokenIssuedAt = approvedAt,
+) {
+  const sb = getSupabase();
+  const { url, expiresAt } = await issueDownloadToken(order.id, order.productId, tokenIssuedAt);
   const message = linkMessage(order.buyerName, product, url, expiresAt);
   const channels = channelsOf(order);
 
@@ -247,15 +263,8 @@ async function dispatchOrderLink(order: Order, product: Product, approvedAt: num
 
 // 관리자 승인: 승인 시각 + 5시간짜리 링크 발급 → 이메일 자동 발송 및 피클 AI / 인스타 DM용 링크 생성
 export async function approveOrder(orderId: string) {
-  const sb = getSupabase();
-  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
-  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
-  const order = mapOrder(ordRow);
+  const { order, product } = await loadOrderAndProduct(orderId);
   if (!APPROVABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "이미 처리된 주문입니다.", 409);
-
-  const { data: prodRow } = await sb.from("products").select("*").eq("id", order.productId).maybeSingle();
-  if (!prodRow) throw new OrderError("NOT_FOUND", "상품 정보를 찾을 수 없습니다.", 404);
-  const product = mapProduct(prodRow);
 
   const approvedAt = Date.now();
   const link = await dispatchOrderLink(order, product, approvedAt, false);
@@ -265,18 +274,11 @@ export async function approveOrder(orderId: string) {
 
 // 재발급: 이전 링크를 폐기하고 지금부터 5시간짜리 링크를 다시 발급
 export async function reissueOrder(orderId: string) {
-  const sb = getSupabase();
-  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
-  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
-  const order = mapOrder(ordRow);
+  const { order, product } = await loadOrderAndProduct(orderId);
   if (!REISSUABLE.includes(order.status)) throw new OrderError("BAD_STATUS", "승인된 주문만 재발급할 수 있습니다.", 409);
 
-  const { data: prodRow } = await sb.from("products").select("*").eq("id", order.productId).maybeSingle();
-  if (!prodRow) throw new OrderError("NOT_FOUND", "상품 정보를 찾을 수 없습니다.", 404);
-  const product = mapProduct(prodRow);
-
   const now = Date.now();
-  const link = await dispatchOrderLink(order, product, order.approvedAt ?? now, true);
+  const link = await dispatchOrderLink(order, product, order.approvedAt ?? now, true, now);
   await logOrder(`다운로드 링크 재발급: ${order.orderNumber}`, { orderId });
   return { orderNumber: order.orderNumber, ...link };
 }
@@ -369,13 +371,12 @@ export async function publicOrderStatus(orderNumber: string) {
   };
 }
 
-export async function adminOverview() {
+async function loadOrdersWithTokens() {
   const sb = getSupabase();
-  const [ordersRes, productsRes, tokensRes, logsRes] = await Promise.all([
+  const [ordersRes, productsRes, tokensRes] = await Promise.all([
     sb.from("orders").select("*").order("created_at", { ascending: false }).limit(200),
     sb.from("products").select("*"),
-    sb.from("download_tokens").select("*").eq("is_revoked", false),
-    sb.from("order_logs").select("*").order("id", { ascending: false }).limit(60),
+    sb.from("download_tokens").select("*").eq("is_revoked", false).order("created_at", { ascending: false }),
   ]);
 
   const orderList = (ordersRes.data ?? []).map(mapOrder);
@@ -384,28 +385,185 @@ export async function adminOverview() {
     return [p.id, p];
   }));
   const activeTokens = (tokensRes.data ?? []).map(mapDownloadToken);
+
+  return orderList.map((order) => {
+    const product = productMap.get(order.productId);
+    const label = product ? [product.subject, product.title].filter(Boolean).join(" · ") : order.productId;
+    const token = activeTokens.find((t) => t.orderId === order.id);
+    const dmMessage =
+      order.downloadUrl && token && product
+        ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt)
+        : null;
+    return { order, product, label, token, dmMessage };
+  });
+}
+
+export async function adminOverview() {
+  const sb = getSupabase();
+  const [items, logsRes] = await Promise.all([
+    loadOrdersWithTokens(),
+    sb.from("order_logs").select("*").order("id", { ascending: false }).limit(60),
+  ]);
   const logs: OrderLog[] = (logsRes.data ?? []).map(mapOrderLog);
 
   return {
     now: Date.now(),
-    orders: orderList.map((order) => {
-      const product = productMap.get(order.productId);
-      const label = product ? [product.subject, product.title].filter(Boolean).join(" · ") : order.productId;
-      const token = activeTokens.find((t) => t.orderId === order.id);
-      const dmMessage =
-        order.downloadUrl && token && product
-          ? linkMessage(order.buyerName, product, order.downloadUrl, token.expiresAt)
-          : null;
-      return {
-        ...order,
-        productLabel: label,
-        dmMessage,
-        token: token
-          ? { expiresAt: token.expiresAt }
-          : null,
-      };
-    }),
+    orders: items.map(({ order, label, token, dmMessage }) => ({
+      ...order,
+      productLabel: label,
+      dmMessage,
+      token: token ? { expiresAt: token.expiresAt } : null,
+    })),
     logs,
+  };
+}
+
+export type AgentOrderScope = "todo" | "done" | "all";
+
+export async function listOrdersForAgent(scope: AgentOrderScope = "todo") {
+  const items = await loadOrdersWithTokens();
+  const filtered = items.filter(({ order }) => {
+    if (scope === "all") return true;
+    const isTodo =
+      ["PENDING_VERIFICATION", "NOTIFIED_USER", "APPROVED", "DISPATCHING", "DISPATCH_FAILED"].includes(order.status) ||
+      !!order.reissueRequestedAt;
+    return scope === "todo" ? isTodo : !isTodo;
+  });
+
+  return filtered.map(({ order, label, token, dmMessage }) => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    needsAction: ["PENDING_VERIFICATION", "NOTIFIED_USER"].includes(order.status)
+      ? ("APPROVE" as const)
+      : order.reissueRequestedAt
+        ? ("REISSUE" as const)
+        : ("DISPATCH" as const),
+    buyerName: order.buyerName,
+    depositorName: order.depositorName,
+    buyerEmail: order.buyerEmail,
+    buyerInstagram: order.buyerInstagram,
+    buyerPhone: order.buyerPhone,
+    preferredChannel: order.preferredChannel,
+    channels: channelsOf(order),
+    paymentMethod: order.paymentMethod,
+    productId: order.productId,
+    productLabel: label,
+    totalAmount: order.totalAmount,
+    reissueRequestedAt: order.reissueRequestedAt,
+    downloadUrl: order.downloadUrl,
+    expiresAt: token?.expiresAt ?? null,
+    dmMessage,
+    createdAt: order.createdAt,
+    approvedAt: order.approvedAt,
+    deliveredAt: order.deliveredAt,
+  }));
+}
+
+// 외부 자동화 에이전트 전용: 이메일/인스타 실제 발송은 GCP 에이전트가 담당하고, 여기서는 링크 발급 및 APPROVED 전환만 수행
+export async function approveOrReissueForAgent(orderId: string, opts?: { reissue?: boolean }) {
+  const { order, product } = await loadOrderAndProduct(orderId);
+  const now = Date.now();
+  let isReissue = false;
+  let approvedAt = now;
+
+  if (APPROVABLE.includes(order.status)) {
+    isReissue = false;
+    approvedAt = now;
+  } else if (REISSUABLE.includes(order.status) && (opts?.reissue || order.reissueRequestedAt !== null || order.status === "APPROVED")) {
+    isReissue = true;
+    approvedAt = order.approvedAt ?? now;
+  } else {
+    throw new OrderError("BAD_STATUS", "승인 또는 재발급할 수 없는 주문 상태입니다.", 409);
+  }
+
+  const { url, expiresAt } = await issueDownloadToken(order.id, order.productId, now);
+  const message = linkMessage(order.buyerName, product, url, expiresAt);
+
+  const { error } = await getSupabase()
+    .from("orders")
+    .update({
+      status: "APPROVED",
+      approved_at: approvedAt,
+      delivered_at: null,
+      reissue_requested_at: null,
+      download_url: url,
+      email_error: null,
+    })
+    .eq("id", order.id);
+
+  if (error) throw new Error(`주문 승인 상태 갱신 실패: ${error.message}`);
+
+  await logOrder(
+    `에이전트 ${isReissue ? "5시간 링크 재발급" : "승인 및 5시간 링크 발급"}: ${order.orderNumber}`,
+    { orderId: order.id },
+  );
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    status: "APPROVED" as const,
+    isReissue,
+    approvedAt,
+    expiresAt,
+    downloadUrl: url,
+    message,
+    buyerName: order.buyerName,
+    depositorName: order.depositorName,
+    buyerEmail: order.buyerEmail,
+    buyerInstagram: order.buyerInstagram,
+    preferredChannel: order.preferredChannel,
+    channels: channelsOf(order),
+    productLabel: productLabel(product),
+    totalAmount: order.totalAmount,
+  };
+}
+
+// 외부 자동화 에이전트 전용: 채널 발송 완료 후 주문 상태를 DELIVERED 로 전환 (멱등)
+export async function completeOrderForAgent(orderId: string, opts?: { channels?: string[]; note?: string }) {
+  const sb = getSupabase();
+  const { data: ordRow } = await sb.from("orders").select("*").eq("id", orderId).maybeSingle();
+  if (!ordRow) throw new OrderError("NOT_FOUND", "주문을 찾을 수 없습니다.", 404);
+  const order = mapOrder(ordRow);
+
+  if (order.status === "DELIVERED") {
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      status: "DELIVERED" as const,
+      deliveredAt: order.deliveredAt,
+      alreadyDelivered: true,
+    };
+  }
+
+  if (!["APPROVED", "DISPATCHING", "DISPATCH_FAILED"].includes(order.status)) {
+    throw new OrderError("BAD_STATUS", "발송 완료 처리할 수 없는 주문 상태입니다.", 409);
+  }
+
+  const deliveredAt = Date.now();
+  const patch: Record<string, unknown> = {
+    status: "DELIVERED",
+    delivered_at: deliveredAt,
+  };
+  if (opts?.channels?.includes("EMAIL")) {
+    patch.email_sent_at = deliveredAt;
+  }
+
+  const { error } = await sb.from("orders").update(patch).eq("id", order.id);
+  if (error) throw new Error(`발송 완료 처리 실패: ${error.message}`);
+
+  const channelDetail = opts?.channels?.length ? ` [${opts.channels.join("+")}]` : "";
+  const noteDetail = opts?.note ? ` (${opts.note.slice(0, 120)})` : "";
+  await logOrder(`에이전트 자동 발송 완료 처리: ${order.orderNumber}${channelDetail}${noteDetail}`, {
+    orderId: order.id,
+  });
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    status: "DELIVERED" as const,
+    deliveredAt,
+    alreadyDelivered: false,
   };
 }
 

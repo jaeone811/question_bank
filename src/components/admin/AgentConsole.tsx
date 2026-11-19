@@ -40,10 +40,12 @@ export function AgentConsole({
   initial,
   emailReady,
   pickleWebhookReady,
+  agentApiReady = false,
 }: {
   initial: AdminOverview;
   emailReady: boolean;
   pickleWebhookReady: boolean;
+  agentApiReady?: boolean;
 }) {
   const [data, setData] = useState(initial);
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("todo");
@@ -107,14 +109,14 @@ export function AgentConsole({
 
       <aside className="console__side" aria-label="연동 및 작업 상태">
         <div className="panel">
-          <h2>발송 처리 순서 (피클 AI)</h2>
+          <h2>발송 처리 순서 (자동 발송 / 수동)</h2>
           <dl className="kv">
-            <div><dt>1단계</dt><dd><b>[1. 승인 및 5시간 링크 생성]</b> 클릭</dd></div>
-            <div><dt>2단계</dt><dd>생성된 <b>발송 문구</b>를 복사해 구매자가 선택한 곳(인스타 DM 또는 이메일)으로 전송</dd></div>
-            <div><dt>3단계</dt><dd><b>[3. 발송 완료 처리]</b> 클릭 (완료 탭으로 이동)</dd></div>
+            <div><dt>1단계</dt><dd>자동 발송(Telegram 승인) 또는 수동으로 <b>[1. 승인 및 5시간 링크 생성]</b> 실행</dd></div>
+            <div><dt>2단계</dt><dd>인스타 공식 DM(24시간 선제 DM 창) 또는 Gmail(<code>cocojjone99@gmail.com</code>)로 발송 문구 전송</dd></div>
+            <div><dt>3단계</dt><dd>발송 성공 시 자동으로 <b>[발송 완료]</b> 탭으로 이동 (수동 발송 시 아래 <b>[3. 발송 완료 처리]</b> 클릭)</dd></div>
           </dl>
           <p className="panel__hint">
-            저장소: Supabase · 이메일 서버 발송: {emailReady ? "활성" : "피클 AI 직접 발송"} · 웹훅: {pickleWebhookReady ? "활성" : "미사용"}
+            저장소: Supabase · Agent REST API: {agentApiReady ? "활성" : "미설정"} · 이메일 직접 발송: {emailReady ? "활성" : "비활성"} · 웹훅: {pickleWebhookReady ? "활성" : "미사용"}
           </p>
         </div>
 

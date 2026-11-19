@@ -20,8 +20,17 @@ const HEADLINE: Record<PublicOrderStatus["status"], { tone: Tone; title: string;
   REJECTED: { tone: "bad", title: "입금 내역을 확인하지 못했습니다", body: "입금자명과 금액을 확인하신 뒤 판매자에게 문의해 주세요." },
 };
 
-export function OrderStatus({ initial }: { initial: PublicOrderStatus }) {
+export function OrderStatus({
+  initial,
+  sellerInstagram = "haewon_question_bank",
+  senderEmail = "cocojjone99@gmail.com",
+}: {
+  initial: PublicOrderStatus;
+  sellerInstagram?: string;
+  senderEmail?: string;
+}) {
   const [o, setO] = useState(initial);
+  const sellerIg = (sellerInstagram || "haewon_question_bank").replace(/^@/, "");
 
   // 4초마다 상태를 다시 받아 옴 (끝난 주문은 멈춤)
   useEffect(() => {
@@ -38,16 +47,39 @@ export function OrderStatus({ initial }: { initial: PublicOrderStatus }) {
     return () => clearInterval(t);
   }, [o.orderNumber, o.status]);
 
-  const h = HEADLINE[o.status];
+  const headline: Record<PublicOrderStatus["status"], { tone: Tone; title: string; body: string }> = {
+    ...HEADLINE,
+    APPROVED: {
+      tone: "ok",
+      title: "입금이 확인되었습니다",
+      body: o.channels.includes("INSTAGRAM")
+        ? `다운로드 링크를 자동 발송하고 있습니다. 인스타그램 DM 수령 시 @${sellerIg} 계정으로 먼저 DM("신청")을 보내 두셔야 24시간 대화창이 열려 즉시 발송됩니다.`
+        : `다운로드 링크를 ${senderEmail} 이메일로 자동 발송하고 있습니다.`,
+    },
+    DELIVERED: {
+      tone: "ok",
+      title: "다운로드 링크를 보내 드렸습니다",
+      body: `선택하신 곳으로 링크를 자동 발송했습니다. 이메일은 발신자(${senderEmail}) 또는 스팸함을, 인스타그램은 @${sellerIg} DM을 확인해 주세요.`,
+    },
+  };
+
+  const h = headline[o.status];
   const rejected = o.status === "REJECTED";
   const sent = ["DELIVERED", "EXPIRED"].includes(o.status);
   const steps: { label: string; done: boolean; at?: number | null; note?: string }[] = [
     { label: "주문서 접수", done: true, at: o.createdAt },
-    { label: "AI 에이전트 확인", done: o.agentSeen, note: o.agentSeen ? "AI 에이전트가 주문서를 확인했습니다. 판매자 입금 확인 후 즉시 링크가 발송됩니다." : "에이전트가 주문서를 확인할 차례입니다." },
+    {
+      label: "자동 발송 시스템 접수",
+      done: o.agentSeen,
+      note: o.agentSeen
+        ? "자동 발송 시스템에 주문이 접수되었습니다. 관리자 입금 확인 및 승인 후 다운로드 링크가 자동 발송됩니다."
+        : "자동 발송 시스템에서 주문서를 확인할 차례입니다.",
+    },
     { label: "판매자 입금 확인", done: !!o.approvedAt, at: o.approvedAt, note: rejected ? "입금 내역을 확인하지 못했습니다." : undefined },
-    { label: "다운로드 링크 발송", done: sent, at: o.deliveredAt, note: o.channels.map((c) => CHANNEL[c]).join(", ") + "(으)로 보내 드립니다." },
+    { label: "다운로드 링크 발송", done: sent, at: o.deliveredAt, note: o.channels.map((c) => CHANNEL[c]).join(", ") + "(으)로 자동 발송됩니다." },
   ];
   const current = steps.findIndex((s) => !s.done);
+  const showIgPrompt = o.channels.includes("INSTAGRAM") && !["DELIVERED", "EXPIRED", "REJECTED"].includes(o.status);
 
   return (
     <div className="status">
@@ -64,6 +96,18 @@ export function OrderStatus({ initial }: { initial: PublicOrderStatus }) {
           <Link className="btn btn--primary" href={`/download/expired?order=${o.orderNumber}`}>링크 재발급 요청하기</Link>
         ) : null}
       </div>
+
+      {showIgPrompt ? (
+        <div className="notice notice--wait" role="note">
+          <p>
+            <b>인스타그램 DM 24시간 대화창 안내:</b> 아직{" "}
+            <a href={`https://ig.me/m/${sellerIg}`} target="_blank" rel="noopener noreferrer">
+              <b>@{sellerIg}</b>
+            </a>{" "}
+            계정으로 DM을 보내지 않으셨다면 지금 먼저 DM(예: <code>신청</code>)을 보내 주세요. 관리자 승인 후 아직 DM이 없으면 대기 상태로 보관되었다가, DM을 보내시는 즉시 다운로드 링크가 자동 발송됩니다.
+          </p>
+        </div>
+      ) : null}
 
       <div className="status__grid">
         <ol className="timeline">

@@ -23,9 +23,29 @@ type Pay = {
   bank: { name: string; account: string; holder: string };
 };
 
+type DeliveryInfo = {
+  sellerInstagram: string;
+  senderEmail: string;
+};
+
+const DEFAULT_DELIVERY: DeliveryInfo = {
+  sellerInstagram: "haewon_question_bank",
+  senderEmail: "cocojjone99@gmail.com",
+};
+
 const dash = (v: string | number | null | undefined, unit = "") => (v === null || v === undefined || v === "" ? "미정" : `${v}${unit}`);
 
-export function Storefront({ products, pay }: { products: StoreProduct[]; pay: Pay }) {
+export function Storefront({
+  products,
+  pay,
+  delivery = DEFAULT_DELIVERY,
+}: {
+  products: StoreProduct[];
+  pay: Pay;
+  delivery?: DeliveryInfo;
+}) {
+  const sellerIg = (delivery.sellerInstagram || DEFAULT_DELIVERY.sellerInstagram).replace(/^@/, "");
+  const senderEmail = delivery.senderEmail || DEFAULT_DELIVERY.senderEmail;
   const subjects = useMemo(() => [...new Set(products.map((p) => p.subject).filter(Boolean))] as string[], [products]);
   const grades = useMemo(() => [...new Set(products.map((p) => p.grade))], [products]);
   const [subject, setSubject] = useState<string | null>(null);
@@ -96,7 +116,7 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
             <p className="eyebrow">고2 기말고사 대비</p>
             <h1><span>고2 내신 변형 문제,</span> <span>샘플을 먼저 확인하고</span> <span>구매하세요</span></h1>
             <p className="lead">
-              학교 시험 범위에 맞춰 만든 변형 문제 PDF입니다. 구매 전에 앞 2쪽을 그대로 보여 드리고, 입금이 확인되면 5시간 동안 유효한 다운로드 링크를 인스타그램 DM이나 이메일로 보내 드립니다.
+              학교 시험 범위에 맞춰 만든 변형 문제 PDF입니다. 구매 전에 앞 2쪽을 그대로 보여 드리고, 입금 확인 후 5시간 동안 유효한 다운로드 링크를 인스타그램 DM(@{sellerIg})이나 이메일({senderEmail})로 자동 발송해 드립니다.
             </p>
 
             {products.length > 0 ? (
@@ -225,13 +245,13 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
         <div className="wrap split">
           <div className="split__aside">
             <h2>구매 절차</h2>
-            <p>결제 대행사를 거치지 않고 계좌이체로 진행합니다. 입금 확인 후 즉시 링크가 발송됩니다.</p>
+            <p>결제 대행사를 거치지 않고 계좌이체로 진행합니다. 입금 확인 후 승인되면 자동 발송 시스템이 5시간 다운로드 링크를 보내 드립니다.</p>
           </div>
           <ol className="steps">
             <li><b>샘플 확인</b><span>자료마다 앞 2쪽을 그대로 보실 수 있습니다.</span></li>
             <li><b>계좌 송금 후 주문서 제출</b><span>안내된 계좌로 입금하시고 통장에 표시되는 입금자명을 적어 주세요.</span></li>
-            <li><b>입금 확인</b><span>주문 조회 화면에서 진행 상황을 바로 확인하실 수 있습니다.</span></li>
-            <li><b>다운로드 링크 수령</b><span>승인 시각부터 5시간 동안 받으실 수 있습니다.</span></li>
+            <li><b>인스타 DM 선택 시 선제 DM 발송</b><span>인스타그램 DM 수령을 선택하셨다면 @{sellerIg} 계정으로 먼저 DM(예: &quot;신청&quot;)을 보내 주세요. (이메일만 수령 시 생략 가능)</span></li>
+            <li><b>입금 확인 및 다운로드 링크 자동 발송</b><span>관리자 입금 확인 후 5시간 동안 유효한 다운로드 링크를 인스타그램 DM 또는 이메일({senderEmail})로 자동 발송해 드립니다.</span></li>
           </ol>
         </div>
       </section>
@@ -245,13 +265,14 @@ export function Storefront({ products, pay }: { products: StoreProduct[]; pay: P
             <div><dt>환불</dt><dd>디지털 자료 특성상 다운로드 링크가 발송된 뒤에는 환불이 어렵습니다. 링크 발송 전에는 요청하시면 전액 환불해 드립니다.</dd></div>
             <div><dt>워터마크</dt><dd>받으시는 PDF의 모든 쪽에 구매자 성함, 연락처, 주문번호가 반투명하게 표시됩니다.</dd></div>
             <div><dt>복제 금지</dt><dd>자료는 구매하신 분의 개인 학습용입니다. 공유, 재배포, 재판매는 허용되지 않습니다.</dd></div>
+            <div><dt>인스타 DM 안내</dt><dd>인스타그램 공식 API 정책상 구매자가 @{sellerIg} 계정으로 먼저 DM(예: &quot;신청&quot;)을 보내주셔야 24시간 대화창이 열려 자동 발송됩니다. 승인 시점에 아직 DM을 보내지 않으셨더라도 이후 DM을 보내시는 즉시 링크가 자동 발송됩니다.</dd></div>
             <div><dt>링크 만료</dt><dd>5시간이 지나 링크가 만료된 경우 재발급을 요청하실 수 있습니다.</dd></div>
           </dl>
         </div>
       </section>
 
       {sample ? <SampleModal product={sample} classDiscount={classDiscount} onClose={() => setSample(null)} onBuy={() => { setBuying(sample); setSample(null); }} /> : null}
-      {buying ? <Checkout product={buying} pay={pay} classDiscount={classDiscount} studentNo={studentNo} onClose={() => setBuying(null)} /> : null}
+      {buying ? <Checkout product={buying} pay={pay} sellerIg={sellerIg} senderEmail={senderEmail} classDiscount={classDiscount} studentNo={studentNo} onClose={() => setBuying(null)} /> : null}
     </>
   );
 }
@@ -321,7 +342,23 @@ function SampleModal({ product, classDiscount, onClose, onBuy }: { product: Stor
 
 type Channel = "INSTAGRAM_DM" | "EMAIL" | "BOTH";
 
-function Checkout({ product, pay, classDiscount, studentNo, onClose }: { product: StoreProduct; pay: Pay; classDiscount: boolean; studentNo: string | null; onClose: () => void }) {
+function Checkout({
+  product,
+  pay,
+  sellerIg,
+  senderEmail,
+  classDiscount,
+  studentNo,
+  onClose,
+}: {
+  product: StoreProduct;
+  pay: Pay;
+  sellerIg: string;
+  senderEmail: string;
+  classDiscount: boolean;
+  studentNo: string | null;
+  onClose: () => void;
+}) {
   const ref = useOverlay(onClose);
   const router = useRouter();
   const [channel, setChannel] = useState<Channel>("INSTAGRAM_DM");
@@ -455,10 +492,18 @@ function Checkout({ product, pay, classDiscount, studentNo, onClose }: { product
             </div>
             {needInsta ? (
               <>
-                <p className="notice notice--wait">
-                  <b>인스타그램 비공개 계정 안내:</b> 계정이 <b>비공개</b>이거나 메시지 요청 허용이 꺼져 있으면 DM 발송이 불가능합니다. 링크 수령 전까지 <b>비공개를 해제</b>해 주시거나, 위에서 <b>이메일</b>(또는 <b>둘 다</b>) 수령을 선택해 주세요.
-                </p>
-                <Field label="인스타그램 아이디" hint="비공개 계정은 반드시 공개로 전환해 주세요. 발송된 메시지는 '메시지 요청함'에 들어갈 수 있습니다." error={errors.buyerInstagram}>
+                <div className="notice notice--wait">
+                  <p>
+                    <b>인스타그램 공식 DM 24시간 대화창 안내:</b> Meta 인스타그램 공식 API 정책에 따라, 아래에 입력하시는 본인 계정으로{" "}
+                    <b>@{sellerIg}</b> 계정에 먼저 DM(예: <code>신청</code>)을 1회 보내셔야 24시간 대화창이 열려 자동 발송됩니다. 입금 승인 시점에 아직 DM을 보내지 않으셨더라도 이후 DM을 보내시는 즉시 자동 발송됩니다.
+                  </p>
+                  <p style={{ marginTop: "0.5rem" }}>
+                    <a className="btn btn--ghost btn--sm" href={`https://ig.me/m/${sellerIg}`} target="_blank" rel="noopener noreferrer">
+                      @{sellerIg} DM 보내기
+                    </a>
+                  </p>
+                </div>
+                <Field label="인스타그램 아이디" hint={`@${sellerIg} 계정으로 먼저 DM("신청")을 보낼 본인 인스타그램 아이디를 정확히 입력해 주세요.`} error={errors.buyerInstagram}>
                   <span className="prefixed">
                     <span aria-hidden="true">@</span>
                     <input data-field="buyerInstagram" className="num" value={f.buyerInstagram} onChange={(e) => set("buyerInstagram", e.target.value.replace(/^@+/, "").toLowerCase())} maxLength={30} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="my.instagram" />
@@ -467,7 +512,7 @@ function Checkout({ product, pay, classDiscount, studentNo, onClose }: { product
               </>
             ) : null}
             {needEmail ? (
-              <Field label="이메일 주소" error={errors.buyerEmail}>
+              <Field label="이메일 주소" hint={`발신자 ${senderEmail} · 제목 "[기말고사 문제은행] 주문하신 자료 다운로드 링크 안내"로 발송됩니다. 메일이 보이지 않으면 스팸함을 확인해 주세요.`} error={errors.buyerEmail}>
                 <input data-field="buyerEmail" type="email" value={f.buyerEmail} onChange={(e) => set("buyerEmail", e.target.value)} autoComplete="email" placeholder="name@example.com" />
               </Field>
             ) : null}

@@ -24,6 +24,10 @@ export default async function Home() {
       pay={{
         bank: config.bank,
       }}
+      delivery={{
+        sellerInstagram: config.sellerInstagram,
+        senderEmail: config.senderEmail,
+      }}
     />
   );
 }

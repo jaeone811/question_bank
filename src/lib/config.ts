@@ -29,7 +29,13 @@ export const config = {
     return env("TOSS_LINK");
   },
   get sellerInstagram() {
-    return env("SELLER_INSTAGRAM").replace(/^@/, "");
+    return (env("SELLER_INSTAGRAM") || "haewon_question_bank").replace(/^@/, "");
+  },
+  get senderEmail() {
+    return env("SENDER_EMAIL") || env("GMAIL_USER") || "cocojjone99@gmail.com";
+  },
+  get agentApiToken() {
+    return env("AGENT_API_TOKEN");
   },
   get gmail() {
     return { user: env("GMAIL_USER"), appPassword: env("GMAIL_APP_PASSWORD").replace(/\s+/g, "") };

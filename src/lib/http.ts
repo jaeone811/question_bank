@@ -1,5 +1,7 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { isAdmin } from "./auth";
+import { config } from "./config";
 import { OrderError } from "./orders";
 
 export const fail = (status: number, error: string, extra: object = {}) => NextResponse.json({ ok: false, error, ...extra }, { status });
@@ -30,9 +32,13 @@ function sameOrigin(req: Request) {
   }
 }
 
-export async function adminRoute(req: Request, fn: () => Promise<unknown> | unknown) {
-  if (!(await isAdmin())) return fail(401, "관리자 로그인이 필요합니다.");
-  if (req.method !== "GET" && !sameOrigin(req)) return fail(403, "허용되지 않은 요청입니다.");
+function safeTokenEqual(a: string, b: string) {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ha, hb);
+}
+
+async function runJsonHandler(fn: () => Promise<unknown> | unknown) {
   try {
     return NextResponse.json({ ok: true, data: (await fn()) ?? null });
   } catch (e) {
@@ -41,4 +47,22 @@ export async function adminRoute(req: Request, fn: () => Promise<unknown> | unkn
     const detail = e instanceof Error ? e.message : "알 수 없는 오류";
     return fail(500, `처리 중 오류가 발생했습니다: ${detail}`);
   }
+}
+
+export async function adminRoute(req: Request, fn: () => Promise<unknown> | unknown) {
+  if (!(await isAdmin())) return fail(401, "관리자 로그인이 필요합니다.");
+  if (req.method !== "GET" && !sameOrigin(req)) return fail(403, "허용되지 않은 요청입니다.");
+  return runJsonHandler(fn);
+}
+
+export async function agentRoute(req: Request, fn: () => Promise<unknown> | unknown) {
+  const expected = config.agentApiToken;
+  if (!expected) return fail(503, "AGENT_API_TOKEN 환경변수가 설정되지 않았습니다.");
+  const authHeader = req.headers.get("authorization") ?? "";
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader);
+  const token = match?.[1]?.trim() ?? "";
+  if (!token || !safeTokenEqual(token, expected)) {
+    return fail(401, "인증 토큰이 올바르지 않습니다.");
+  }
+  return runJsonHandler(fn);
 }

@@ -17,6 +17,7 @@ export default async function Page() {
           initial={await adminOverview()}
           emailReady={!!(config.gmail.user && config.gmail.appPassword)}
           pickleWebhookReady={!!config.pickle.webhookUrl}
+          agentApiReady={!!config.agentApiToken}
         />
       </div>
     </section>

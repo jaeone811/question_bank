@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { OrderStatus } from "@/components/OrderStatus";
+import { config } from "@/lib/config";
 import { publicOrderStatus } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,11 @@ export default async function Page({ params }: { params: Promise<{ orderNumber: 
   return (
     <section className="section section--page">
       <div className="wrap wrap--narrow">
-        <OrderStatus initial={data} />
+        <OrderStatus
+          initial={data}
+          sellerInstagram={config.sellerInstagram}
+          senderEmail={config.senderEmail}
+        />
       </div>
     </section>
   );
